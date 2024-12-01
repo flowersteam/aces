@@ -1,0 +1,22 @@
+skill_list = [
+    "String Manipulation",
+    "Mathematical Operations",
+    "Conditional Logic",
+    "Recursion",
+    "Brute Force Search",
+    "Dynamic Programming",
+    "Greedy Algorithms",
+    "Backtracking",
+    "Set Operations",
+    "Permutations and Combinations",
+    "Probability and Statistics",
+    "Pattern Recognition", 
+    "Sorting and Ordering",
+    "Binary Operations (bitwise shifting, AND, OR)",
+    "Geometry and Coordinate Manipulation",
+    "Algorithm Optimization",
+    "Number Theory (factors, primes, etc.)",
+    "Graph Theory (paths, edges, vertices)",
+    "Array Indexing",
+    "Hashing"
+]

@@ -6,10 +6,8 @@ import textwrap
 import copy
 
 from pydantic import BaseModel,Field
-# from openelm.utils.code_eval import find_first_argument_of_first_function
-# from openelm.environments.p3.prompt_code import base_persona_code, prompt_gen_description
-# from openelm.environments.p3.prompt_code import prompt_rd_gen,prompt_elm,prompt_aces,prompt_aces_elm,instruction_solve_puzzle,list_subskills,prompt_wizard_coder
-# from openelm.utils.code_eval import extract_arguments_except_first_specific
+from aces.environement.p3.utils import find_first_argument_of_first_function, extract_arguments_except_first_specific
+
 skill_list = [
     "String Manipulation",
     "Mathematical Operations",
@@ -71,8 +69,6 @@ def create_prompt_label(puzzle : str, mode="give_skills"):
     description use to give a description of the puzzle
     """
 
-    # level = "master's student in CS"#"master's student"
-    # skills format
     format_skills=""
     for idx,skill in enumerate(skill_list):
         format_skills+=f"{idx}. {skill}\n"
@@ -89,12 +85,6 @@ def create_prompt_label(puzzle : str, mode="give_skills"):
             puzzle=puzzle.split('def g')[0].strip() + "\n\ndef g(...):\n\nassert f(g()) == True"
             prompt=prompt_gen_description.format(arg_sol=arg,arg_solb=arg,puzzle=puzzle)
             prompt += "\n\nThe puzzle is:\n```python\n" + puzzle + "\n```\n"
-        case "description+is_valid": # WIP
-            arg=find_first_argument_of_first_function(puzzle)
-            puzzle=puzzle.split('def g')[0].strip() + "\n\ndef g(...):\n\nassert f(g()) == True"
-            prompt=prompt_gen_description.format(arg_sol=arg,arg_solb=arg,puzzle=puzzle)
-            prompt += f"\nThen you should check if the following puzzle could be used or not to teach Python to {level}."
-            prompt += "\n\nThe puzzle is:\n```python\n" + puzzle + "\n```\n"
         case "give_skills":
             prompt = base_persona+"\n"
             prompt+= "The Professor want to evaluate the diversity of those puzzles, can you label the following puzzle given the following list of topics, please?"
@@ -109,11 +99,26 @@ def create_prompt_label(puzzle : str, mode="give_skills"):
             prompt += "\n\nThe puzzle is:\n```python\n" + puzzle + "\n```\n"            
             prompt += "Respond with two or three sentence explaning the topics used in the puzzle.\n"
             prompt += "Then summarize your response by giving a list from 1 to 5 index corresponding to topics that are actually used in the puzzle above in this format: 'The list of skill use is: [].' where [] is the list of index of the topics used in the puzzle for example [3,5,6]."
-
         case "general":
             prompt= "Given the following puzzle, exctract the information requested."
             prompt += "\n\nThe puzzle is:\n```python\n" + puzzle + "\n```\n"
-            
+    return prompt
+
+
+def get_prompt_label_p3(puzzle,skill_list=skill_list):
+    format_skills=""
+    for idx,skill in enumerate(skill_list):
+        format_skills+=f"{idx}. {skill}\n"
+    skills = f"\n{format_skills}"
+    prompt_skills_labeling.format(skills=skills,puzzle=puzzle)
+    return prompt_skills_labeling
+
+def get_prompt_description_p3(puzzle):
+    arg=find_first_argument_of_first_function(puzzle)
+    #just want description of the problem
+    puzzle=puzzle.split('def g')[0].strip() + "\n\ndef g(...):\n\nassert f(g()) == True"
+    prompt = prompt_gen_description.format(arg_sol=arg,arg_solb=arg,puzzle=puzzle)
+    prompt += "\n\nThe puzzle is:\n```python\n" + puzzle + "\n```\n"
     return prompt
 
 
@@ -122,6 +127,7 @@ def get_programming_puzzles_prompt(
         skill_targeted: Optional[List[int]]=None,
         n_fewshot_ex=3,
         aces_elm_mode=False,
+        difficulty_range=(90,100),
     ):
     """
     should change that to list_few_shot_example from list to Phenotype type
@@ -163,7 +169,7 @@ def get_programming_puzzles_prompt(
     for idx in idx_skill_targeted:
         skill_target += f"\n- {skill_list[idx]}"
 
-    extra_prompt += "You should aim to generate puzzles with a Difficulty score between 90 and 100 out of 100."
+    extra_prompt += f"You should aim to generate puzzles with a Difficulty score between {difficulty_range[0]} and {difficulty_range[1]} out of 100."
     prompt = prompt.format(examples=examples,skill_target=skill_target,extra=extra_prompt)
     # prompt += prompt2add
     return prompt
@@ -200,9 +206,24 @@ def prompt_solve_puzzle_given_f(problem_str: str):
 
 
 
+
 base_persona_code ="""You are a helpful assistant to a Professor teaching a programming course in Python. 
 The Professor want to give Pyhton programming puzzles to his Computer Science student to teach them Python.
 A Python programming puzzle is defined by two functions, the puzzle f(…) and the solution g(…). f defines an algorithmic challenge, and g solves this challenge. g is a solution to f if and only if f(g()) == True."""
+
+prompt_skills_labeling = base_persona_code + """
+The Professor want to evaluate the diversity of those puzzles, can you label the following puzzle given the following list of topics, please?
+nThe list of topics is:
+{skills}
+
+The puzzle is:
+```python
+{puzzle}
+```
+Respond with two or three sentence explaning the topics used in the puzzle.
+Then summarize your response by giving a list from 1 to 5 index corresponding to topics that are actually used in the puzzle above in this format: 'The list of skill use is: [].' where [] is the list of index of the topics used in the puzzle for example [3,5,6].
+"""
+
 
 prompt_gen_description="""A Python programming puzzle is defined by two functions, the problem f(solution, arg1=value1, arg2=value2, ..) and the solution. f defines an algorithmic puzzle, and the solution solves this puzzle.
 You should pay a particular attention that the puzzle is solved if and only if **f(solution) == True**.
@@ -382,3 +403,15 @@ Generate 5 different P3 similar to previous Examples.
 
 ## New 5 problems:
 """
+if __name__ == "__main__":
+    from aces.environement.p3.p3_genotype import P3
+
+    # example of prompt to generate new puzzles
+    p3_1 = P3(program_str="def f(a,b,c): return False", emb=[1,0,1,0,0],fitness=0.5 )
+    p3_2 = P3(program_str="puzzle test2", emb=[1,0,1,0,0],fitness=0.5 )
+    list_p3 = [p3_1, p3_2]
+    skill_targeted=[1,0,1,0,1]
+    print("prompt generate new puzzles:")
+    print(get_programming_puzzles_prompt(list_p3,skill_targeted,n_fewshot_ex=2))
+    print("prompt description:")
+    print(get_prompt_description_p3(p3_1))

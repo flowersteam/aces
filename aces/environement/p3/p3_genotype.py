@@ -1,5 +1,5 @@
 from typing import List, Optional
-class P3ProbSolResult:
+class P3:
     def __init__(self, program_str: str, emb: list= None,
                   idx_generation: int=-1,target_skills=None,fitness: int =None, quality: int =None,
                   description:str=" description of the puzzle",  is_valid:bool=None, puzzle_history: list = [],puzzles_id_fewshot:list[str]=[],

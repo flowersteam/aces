@@ -1,2 +1,8 @@
 
 aces.egg-info/
+
+aces/__pycache__/
+
+aces/environement/p3/preprocess_p3_emb_3_puzzles.json
+
+aces/environement/p3/__pycache__/
