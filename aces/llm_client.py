@@ -16,7 +16,7 @@ class Response:
 
 
 class LLMClient:
-    def __init__(self, model: str, cfg_generation: dict, base_url: str, api_key: str, online: bool = False, gpu=1):
+    def __init__(self, model: str, cfg_generation: dict, base_url: str, api_key: str, online: bool = False, gpu=1, max_model_length=20000):
         self.model_path = model
         self.cfg_generation = cfg_generation
         self.base_url = base_url
@@ -24,6 +24,7 @@ class LLMClient:
         self.timeout = 60*30 # 30 minutes timeout
         self.online = online
         self.gpu = gpu
+        self.max_model_length = max_model_length
 
         if online:
             self.init_client()
@@ -39,7 +40,7 @@ class LLMClient:
             raise Exception("Server is down or unreachable")
 
     def init_offline_model(self):
-        self.llm = LLM(self.model_path, tensor_parallel_size = self.gpu, max_model_len=30000, enable_prefix_caching=True)
+        self.llm = LLM(self.model_path, tensor_parallel_size = self.gpu, max_model_len=self.max_model_length, enable_prefix_caching=True)
          
 
     def multiple_completion(self, batch_prompt,judge=False,guided_choice=["1","2"],n=1):
@@ -104,7 +105,7 @@ def get_completion_offline(llm,batch_prompt,cfg_generation,n=1):
                     allowed_token_ids=alowed_tokens
                     )
                 flag_judge=True
-    batch_prompt_formated = tokenizer.apply_chat_template(batch_prompt,tokenize=False)
+    batch_prompt_formated = tokenizer.apply_chat_template(batch_prompt,tokenize=False,add_generation_prompt=True)
     outs = llm.generate(batch_prompt_formated,sampling_params)
     list_out_process=[]
     logprobs=None

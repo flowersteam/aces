@@ -14,13 +14,14 @@ class ACES_p3:
     def __init__(self, AcesArguments: dataclass, LLMArguments : dataclass):
         # initialize LLM client
         self.llm_args = LLMArguments
+        self.skill_list = skill_list
+
         self.init_llm()
         # initialize environment
         self.aces_args = AcesArguments 
         self.initialize_environment()
         self.archive = []
         self.semantic_descriptors = []
-        self.skill_list = skill_list
 
     def init_llm(self,) -> None:
         """init LLM client"""
@@ -31,7 +32,9 @@ class ACES_p3:
                              cfg_generation = cfg_generation,
                              base_url = self.llm_args.base_url, 
                              api_key = self.llm_args.api_key, 
-                             online = self.llm_args.online, gpu = self.llm_args.gpu)
+                             online = self.llm_args.online, 
+                             gpu = self.llm_args.gpu,
+                             max_model_length = self.llm_args.max_model_length)
         print("LLM client initialized")
     
     def initialize_environment(self) -> None:
@@ -53,20 +56,28 @@ class ACES_p3:
         list_p3 = self.generate_description(list_p3)
         self.archives = list_p3
 
+    def formating_chat_prompt(self, list_prompt_str: list[str]) -> list[list[dict]]:
+        """Format list of prompt string to chat prompt"""
+        list_prompt_chat=[]
+        for prompt in list_prompt_str:
+            # check whether I used syst prompt or not
+            list_prompt_chat.append([{"role": "user", "content": prompt}])
+        return list_prompt_chat
+    
     def generate_multiple_solutions(self, puzzles: list[P3]) -> List[P3]:
         """Use LLM to generate multiple solutions for a list of puzzle"""
         list_prompt_sol = []
         for p in puzzles:
             list_prompt_sol.append(prompt_solve_puzzle_given_f(p.program_str))
-        list_solutions = self.llm.multiple_completion(list_prompt_sol,n = self.aces_args.num_solutions)
+        list_solutions = self.llm.multiple_completion(self.formating_chat_prompt(list_prompt_sol),n = self.aces_args.num_solutions)
         for id_puzzle in range(len(puzzles)):
-            f = extract_f(puzzles[id_puzzle].program_str)
-            n_solutions = [f + "\n" + extract_solution(sol) for sol in list_solutions[id_puzzle].response]
-            # TODO: add assert ?
+            problem = puzzles[id_puzzle].program_str 
+            n_solutions = [self.process_solutions(solution=sol,problem=problem) for sol in list_solutions[id_puzzle].response]
             puzzles[id_puzzle].all_solution = n_solutions
         # verify solution with python
         return list_solutions
     
+
     def process_solutions(self, solution: str, problem: str) -> str: 
         """Process solution and return full puzzle (f+g)"""
         puzzle = extract_f(problem) + "\n" + extract_solution(solution)
@@ -104,7 +115,7 @@ class ACES_p3:
 
             number_solution = len(all_solution)
             c = sum(all_solution_correct)
-            k=1
+            k=1 # estimation of pass@1
             
             if c==0:
                 fitness = -np.inf
@@ -124,7 +135,8 @@ class ACES_p3:
         list_prompt = []
         for p in puzzles:
             list_prompt.append(get_prompt_label_p3(p.program_str, self.skill_list))
-        list_skills = self.llm.multiple_completion(list_prompt)
+        list_prompt_chat = self.formating_chat_prompt(list_prompt)
+        list_skills = self.llm.multiple_completion(list_prompt_chat)
         for i in range(len(puzzles)):
             skill, explanation_skill = extract_skill(list_skills[i].response[0])
             puzzles[i].emb = skill
@@ -138,7 +150,7 @@ class ACES_p3:
         list_prompt = []
         for p in puzzles:
             list_prompt.append(get_prompt_description_p3(p.program_str))
-        list_description = self.llm.multiple_completion(list_prompt)
+        list_description = self.llm.multiple_completion(self.formating_chat_prompt(list_prompt))
         for i in range(len(puzzles)):
             puzzles[i].description = list_description[i].response[0]
         return puzzles
@@ -158,9 +170,11 @@ class ACES_p3:
                     'puzzle': candidate_puzzle,
                     'descriptors': actual_descriptors
                 })
+
     
     def generate_novel_target(self) -> List[float]:
         # Generate target that maximizes diversity from existing puzzles
+        #TODO: reproduce aces targeted
         if not self.generated_puzzles:
             return [random.random() for _ in range(self.num_dimensions)]
             
@@ -168,3 +182,93 @@ class ACES_p3:
         existing_descriptors = [p['descriptors'] for p in self.generated_puzzles]
         target = self.find_diverse_target(existing_descriptors)
         return target
+    
+
+if __name__ == '__main__':
+    from dataclasses import dataclass, field
+    from typing import Optional
+
+    @dataclass
+    class AcesArguments:
+        """
+        Arguments pertaining to which model/config/tokenizer we are going to fine-tune from.DataTrainingArguments
+        """
+
+        environement_name : str = field( default = "p3", metadata={"help": "environment name"})
+        path_archive : str = field( default = "/home/flowers/work/aces/aces/environement/p3/preprocess_p3_emb_dedup_puzzles.json", metadata={"help": "path to the archive"})
+        num_solutions: int = field( default = 10, metadata={"help": "number of solutions to generate to compute the difficulty score"})
+        
+    @dataclass
+    class QdArguments:
+        """
+        Arguments pertaining to which model/config/tokenizer we are going to fine-tune from.DataTrainingArguments
+        """
+
+        a: str = field(
+            default="/home/flowers/work/hf/Qwen2.5-Coder-3B-Instruct",
+            metadata={"help": "Path to pretrained model or model identifier from huggingface.co/models"}
+        )
+
+    @dataclass
+    class LLMArguments:
+        """
+        Arguments pertaining to which model/config/tokenizer we are going to fine-tune from.DataTrainingArguments
+        """
+
+        model_name_or_path: str = field(
+            default="/home/flowers/work/hf/Qwen2.5-0.5B-Instruct",
+            metadata={"help": "Path to pretrained model or model identifier from huggingface.co/models"}
+        )
+        online: Optional[bool] = field(
+            default = False,
+            metadata={
+                "help": "use vllm server if True else use offline vllm"
+            },
+        )
+        base_url: Optional[str] = field(
+            default="http://localhost:8000",
+            metadata={
+                "help": "base url for vllm server"
+            },
+        )
+        api_key: Optional[str] = field(
+            default="",
+            metadata={
+                "help": "api key "
+            },
+        )
+        gpu: Optional[bool] = field(
+            default = 1,
+            metadata={
+                "help": "number of gpus to use (vllm)"
+            },
+        )
+        cfg_generation : Optional[bool] = field(
+            default = False,
+            metadata={
+                "help": "use cfg generation"
+            },
+        ),
+        temperature: Optional[float] = field(
+            default = 1.0,
+            metadata={
+                "help": "temperature"
+            },
+        )
+        max_tokens: Optional[int] = field(
+            default = 4000,
+            metadata={
+                "help": "max tokens"
+            },
+        )
+        max_model_length: Optional[int] = field(
+            default = 20000,
+            metadata={
+                "help": "max context size"
+            },
+        )
+
+    # parser = HfArgumentParser((AcesArguments,QdArguments,LLMArguments))
+    # model_args, data_args, training_args = parser.parse_args_into_dataclasses()#["--output_dir", "/home/flowers/work/hf/trained/"])
+    aces_args, qd_args, llm_args = AcesArguments(), QdArguments(), LLMArguments()
+    aces= ACES_p3(aces_args, llm_args)
