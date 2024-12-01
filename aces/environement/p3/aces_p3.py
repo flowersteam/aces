@@ -49,9 +49,8 @@ class ACES_p3:
         list_p3 = self.generate_multiple_solutions(list_p3)
         ## evaluate python code
         list_p3 = self.evaluate_python_code(list_p3)
-
-
-
+        ## generate description
+        list_p3 = self.generate_description(list_p3)
         self.archives = list_p3
 
     def generate_multiple_solutions(self, puzzles: list[P3]) -> List[P3]:
@@ -143,15 +142,6 @@ class ACES_p3:
         for i in range(len(puzzles)):
             puzzles[i].description = list_description[i].response[0]
         return puzzles
-    
-    def generate_puzzle(self, target_descriptors: List[float]) -> str:
-        # Use LLM to generate a puzzle matching target skill descriptors
-        puzzle = self.llm.generate_puzzle(target_descriptors)
-        return puzzle
-        
-    def evaluate_feasibility(self, puzzle: str) -> bool:
-        # Use LLM to check if puzzle is solvable
-        return self.llm.check_solvability(puzzle)
     
     def explore(self, num_iterations: int):
         for _ in range(num_iterations):
