@@ -15,7 +15,6 @@ class Response:
         self.logprobs = logprobs
 
 
-
 class LLMClient:
     def __init__(self, model: str, cfg_generation: dict, base_url: str, api_key: str, online: bool = False, gpu=1):
         self.model_path = model
