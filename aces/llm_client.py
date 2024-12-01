@@ -10,7 +10,7 @@ import time
 
 
 class Response:
-    def __init__(self, response, logprobs):
+    def __init__(self, response: list, logprobs):
         self.response = response
         self.logprobs = logprobs
 
@@ -42,17 +42,17 @@ class LLMClient:
         self.llm = LLM(self.model_path, tensor_parallel_size = self.gpu, max_model_len=30000, enable_prefix_caching=True)
          
 
-    def multiple_completion(self, batch_prompt,judge=False,guided_choice=["1","2"]):
+    def multiple_completion(self, batch_prompt,judge=False,guided_choice=["1","2"],n=1):
         if self.online:
-            if judge:
-                return get_multiple_completions_judge(guided_choice, self.client, batch_prompt, cfg_generation=self.cfg_generation)
-            else:
-                return get_multiple_completions(self.client, batch_prompt, cfg_generation=self.cfg_generation)
+            # if judge:
+            #     return get_multiple_completions_judge(guided_choice, self.client, batch_prompt, cfg_generation=self.cfg_generation)
+            # else:
+            return get_multiple_completions(self.client, batch_prompt, cfg_generation=self.cfg_generation,n=n)
         else:
-            if judge:
-                return get_multiple_completions_judge_offline(guided_choice, self.llm, batch_prompt, cfg_generation=self.cfg_generation)
-            else:
-                return get_completion_offline(self.llm, batch_prompt, cfg_generation=self.cfg_generation)
+            # if judge:
+            #     return get_multiple_completions_judge_offline(guided_choice, self.llm, batch_prompt, cfg_generation=self.cfg_generation)
+            # else:
+            return get_completion_offline(self.llm, batch_prompt, cfg_generation=self.cfg_generation,n=n)
     
 
 def is_server_up(base_url):
@@ -81,11 +81,12 @@ def is_server_up(base_url):
         attempt-=1
         time.sleep(20)
 
-def get_completion_offline(llm,batch_prompt,cfg_generation):
+def get_completion_offline(llm,batch_prompt,cfg_generation,n=1):
     tokenizer = llm.get_tokenizer()
     list_tok_allowed=[]
     flag_judge=False
     sampling_params = SamplingParams(
+        n=n,
         temperature=cfg_generation["temperature"],
         max_tokens=cfg_generation["max_tokens"],
         )
@@ -107,16 +108,17 @@ def get_completion_offline(llm,batch_prompt,cfg_generation):
     outs = llm.generate(batch_prompt_formated,sampling_params)
     list_out_process=[]
     logprobs=None
+    list_response = []
     for completion in outs:
-         
-        response = completion.outputs[0].text
+        for completion_out in completion.outputs:
+            list_response.append(completion_out.text)
         
         if flag_judge:
             list_log=completion.outputs[0].logprobs
             # print(list_log)
             logprobs = extract_top_logprobs_offline(list_log,guided_choice=guided_choice)
 
-        list_out_process.append(Response(response,logprobs))
+        list_out_process.append(Response(list_response,logprobs))
     return list_out_process
 
 def extract_top_logprobs_offline(list_log,guided_choice):
@@ -160,15 +162,18 @@ def get_completion(client, cfg_generation: dict, messages: list, temperature=Non
         print("completion problem: ", e)
         raise e
         
-
-    response = completion.choices[-1].message.content
+    list_response = []
+    #TODO: check that
+    for completion_out in completion.choices:
+        list_response.append(completion_out.message.content)
+    # response = completion.choices[-1].message.content
     if "extra_body" in kwargs:
             if "guided_choice" in kwargs["extra_body"]:
                 logprobs = extract_top_logprobs(completion.choices[-1],guided_choice=kwargs["extra_body"]["guided_choice"])
     else:
         logprobs = None
     
-    return Response(response,logprobs)
+    return Response(list_response,logprobs)
         
 def chunks(lst, n):
     """Yield successive n-sized chunks from lst."""

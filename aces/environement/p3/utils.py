@@ -1,15 +1,18 @@
 import ast
 import json
 
-def find_first_argument_of_first_function(code):
+def find_first_argument_of_first_function(code) -> str:
     parsed_code=ast.parse(code)
     for node in ast.walk(parsed_code):
         if isinstance(node, ast.FunctionDef) and node.name == 'f':
             first_arg = node.args.args[0].arg  # Get the first argument
             # print(f"The first argument of the function '{node.name}' is: {first_arg}")
             return first_arg
+        
+def extract_f(code):
+    return code.split("def g")[0].strip()
 
-def extract_arguments_except_first_specific(func_code, function_name='f'):
+def extract_arguments_except_first_specific(func_code, function_name='f') -> str:
     # Parse the source code into an AST
     tree = ast.parse(func_code)
     
@@ -58,8 +61,21 @@ def extract_arguments_except_first_specific(func_code, function_name='f'):
     
     return ', '.join(result)
 
+def extract_solution(out) -> str:
+    """exctract solution"""
+    try:
+        solution = out.replace("```python","```").replace("```\n","```")
+        if "```" in solution:
+            solution = solution.split("```")[1]
 
-def extract_skill(out):
+        else:
+            solution = solution
+    except:
+        solution = ""
+    return solution
+
+def extract_skill(out) -> list[list[int],str]:
+    """exctract list of sem"""
     split_sentence="The list of skill use is:".lower()
     explanation_skill=out
     if split_sentence in out.lower():
