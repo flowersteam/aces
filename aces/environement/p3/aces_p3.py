@@ -4,11 +4,13 @@ from aces.llm_client import LLMClient
 from dataclasses import dataclass, field
 import json
 from aces.environement.p3.p3_genotype import P3
-from aces.environement.p3.prompt import get_prompt_label_p3, get_prompt_description_p3, prompt_solve_puzzle_given_f
+from aces.environement.p3.prompt_function import get_prompt_label_p3, get_prompt_description_p3, prompt_solve_puzzle_given_f
 from aces.environement.p3.skill_list import skill_list
 from aces.environement.p3.utils import extract_skill, extract_solution, extract_f
 from aces.code_sandbox import evaluate, pass_at_k
 import numpy as np
+import os
+os.environ["TOKENIZERS_PARALLELISM"] = "true"
 #TODO inherite from base ACES class with common stuff
 class ACES_p3:
     def __init__(self, AcesArguments: dataclass, LLMArguments : dataclass):
@@ -70,12 +72,13 @@ class ACES_p3:
         for p in puzzles:
             list_prompt_sol.append(prompt_solve_puzzle_given_f(p.program_str))
         list_solutions = self.llm.multiple_completion(self.formating_chat_prompt(list_prompt_sol),n = self.aces_args.num_solutions)
+        assert len(list_solutions) == len(puzzles)
         for id_puzzle in range(len(puzzles)):
             problem = puzzles[id_puzzle].program_str 
             n_solutions = [self.process_solutions(solution=sol,problem=problem) for sol in list_solutions[id_puzzle].response]
             puzzles[id_puzzle].all_solution = n_solutions
-        # verify solution with python
-        return list_solutions
+        # don't forget to verify solution with python
+        return puzzles
     
 
     def process_solutions(self, solution: str, problem: str) -> str: 
@@ -83,7 +86,8 @@ class ACES_p3:
         puzzle = extract_f(problem) + "\n" + extract_solution(solution)
         puzzle = puzzle.split("\nassert f")
         puzzle = puzzle[0] + "\nassert f(g()) == True\n"
-
+        return puzzle
+    
     def evaluate_python_code(self, puzzles: list[P3]) -> List[P3]:
         """Evaluate python code"""
         list_task_id = []
@@ -137,6 +141,7 @@ class ACES_p3:
             list_prompt.append(get_prompt_label_p3(p.program_str, self.skill_list))
         list_prompt_chat = self.formating_chat_prompt(list_prompt)
         list_skills = self.llm.multiple_completion(list_prompt_chat)
+        assert len(list_skills) == len(puzzles)
         for i in range(len(puzzles)):
             skill, explanation_skill = extract_skill(list_skills[i].response[0])
             puzzles[i].emb = skill
@@ -196,7 +201,7 @@ if __name__ == '__main__':
 
         environement_name : str = field( default = "p3", metadata={"help": "environment name"})
         path_archive : str = field( default = "/home/flowers/work/aces/aces/environement/p3/preprocess_p3_emb_dedup_puzzles.json", metadata={"help": "path to the archive"})
-        num_solutions: int = field( default = 10, metadata={"help": "number of solutions to generate to compute the difficulty score"})
+        num_solutions: int = field( default = 2, metadata={"help": "number of solutions to generate to compute the difficulty score"})
         
     @dataclass
     class QdArguments:

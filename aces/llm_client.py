@@ -109,8 +109,9 @@ def get_completion_offline(llm,batch_prompt,cfg_generation,n=1):
     outs = llm.generate(batch_prompt_formated,sampling_params)
     list_out_process=[]
     logprobs=None
-    list_response = []
+    
     for completion in outs:
+        list_response = []
         for completion_out in completion.outputs:
             list_response.append(completion_out.text)
         
