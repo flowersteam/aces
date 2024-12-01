@@ -30,7 +30,25 @@ class ACES_p3:
         
         self.niche_to_idx_archive = {}
         self.semantic_descriptors = []
+        self.fitnesses = []
         self.rng = np.random.default_rng(self.aces_args.seed)
+
+
+    def niches_filled(self):
+        """Get the number of niches that have been explored in the map."""
+        return len(self.niche_to_idx_archive.keys())
+
+    def max_fitness(self):
+        """Get the maximum fitness value in the map."""
+        return (np.array(self.fitnesses)[np.isfinite(self.fitnesses)]).max()
+
+    def mean_fitness(self):
+        """Get the mean fitness value in the map."""
+        return (np.array(self.fitnesses)[np.isfinite(self.fitnesses)]).mean()
+
+    def min_fitness(self):
+        """Get the minimum fitness value in the map."""
+        return (np.array(self.fitnesses)[np.isfinite(self.fitnesses)]).min()
 
     def init_llm(self,) -> None:
         """init LLM client"""
@@ -77,6 +95,7 @@ class ACES_p3:
                 niche_idx = tuple(p.emb)
                 id_archive = len(self.archives)
                 self.archives.append(p)
+                self.fitnesses.append(p.fitness)
                 if not niche_idx in self.niche_to_idx_archive:
                     self.niche_to_idx_archive[niche_idx] = []
                 self.niche_to_idx_archive[niche_idx].append(id_archive)
@@ -253,7 +272,67 @@ class ACES_p3:
 
     def sample_examples_from_niche(self,niche_idx) -> int:
         """Sample one example from a niche"""
-        #TODO:
+
+        size_niche = len(self.niche_to_idx_archive[niche_idx])
+        if size_niche == 0:
+            raise ValueError('Empty niche')
+        if size_niche == 1:
+            archive_index = self.rng.choice(self.niche_to_idx_archive[niche_idx])
+            archive_index = int(archive_index)
+            return archive_index
+        match self.aces_args.sampling_strategy_examples_from_niche:
+            case 'uniform':
+                # sample a random niche
+                # print(f'nonzero {self.nonzero}')
+                
+                archive_index = self.rng.choice(self.niche_to_idx_archive[niche_idx]) # sample a random individual
+            case 'prob_best_5':
+                # self.nonzero[niche_idx]
+                # sort_keys = sorted(lisself.nonzero.keys())
+                fitness_range = [self.min_fitness(), self.max_fitness()]  # can these be -inf/+inf?
+                # sort indices by fitness
+                fit_idx = [(idx, self.fitnesses[idx]) for idx in self.niche_to_idx_archive[niche_idx]]
+                print(f'fitnesses {[f for _, f in fit_idx]}')
+                print(f'fitness range {fitness_range}')
+                fit_idx = sorted(fit_idx, key=lambda x: x[1])[::-1][:5]  # 5 most fit
+                if fitness_range[1] - fitness_range[0] == 0:
+                    L = 1.
+                else:
+                    L = fitness_range[1] - fitness_range[0]
+                normalized_fitnesses = [(f - fitness_range[0]) / L for _, f in fit_idx]
+                normalized_fitnesses = np.array(normalized_fitnesses)
+                if normalized_fitnesses.sum() == 0:  # all the individuals have the lowest possible fitness
+                    normalized_fitnesses = np.ones_like(normalized_fitnesses) / len(normalized_fitnesses)
+                else:
+                    normalized_fitnesses = normalized_fitnesses / normalized_fitnesses.sum()
+                print(f'probabilities {normalized_fitnesses}')
+                archive_index = self.rng.choice([idx for idx, f, in fit_idx], p=normalized_fitnesses)
+                
+            case 'soft_normalised':
+                puzz_idx = [idx for idx in self.niche_to_idx_archive[niche_idx]]
+                qualities = np.array([self.fitnesses[idx] for idx in self.niche_to_idx_archive[niche_idx]])
+                min_quality = qualities.min()
+                max_quality = qualities.max()
+                if abs(max_quality-min_quality) < 1e-6:
+                    probabilities = np.ones(len(qualities)) / len(qualities)
+                else:
+                    normalized_qualities = (qualities - min_quality) / (max_quality - min_quality)
+                    # Softmax calculation
+                    temperature = self.aces_args.temperature_sampling_strategy_examples_from_niche
+                    scaled_logits = normalized_qualities / temperature
+                    # Subtract the max for numerical stability
+                    exp_logits = np.exp(scaled_logits - np.max(scaled_logits))
+                    probabilities = exp_logits / np.sum(exp_logits)
+                try:
+                    archive_index = self.rng.choice(puzz_idx, p=probabilities)
+                except:
+                    print("proba",probabilities)
+                    print("quality",qualities)
+                    raise ValueError('Error in softmax sampling')
+            case _:
+                raise NotImplementedError(f'Unrecognized sampling strategy "{self.aces_args.sampling_strategy_examples_from_niche}"')
+        archive_index = int(archive_index)
+        return archive_index
 
     def explore(self, num_iterations: int):
         for _ in range(num_iterations):
@@ -302,6 +381,8 @@ if __name__ == '__main__':
         max_descriptor_targeted: int = field( default = 5, metadata={"help": "number of max descriptor to target (at most `max_descriptor_targeted` semantic descriptor sample as goal)"})
         mode_sampling_goal: int = field( default = "uniform", metadata={"help": "['uniform','smart','none'], uniform sample goal uniformely, smart: sample unexplored goal close that are within 1 of distance of already explored goal in the semantic space"})
         seed: int = field(default=0)
+        sampling_strategy_examples_from_niche: str = field(default='uniform', metadata={"help": "sampling strategy to sample examples from a niche, choice: 'uniform','prob_best_5','soft_normalised'; need to explain difference"})
+        temperature_sampling_strategy_examples_from_niche: float = field(default= 1., metadata={"help": "temperature softmax to sample example given their fitness given a niche"})
     @dataclass
     class QdArguments:
         """
