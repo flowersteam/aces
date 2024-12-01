@@ -74,7 +74,7 @@ def extract_solution(out) -> str:
         solution = ""
     return solution
 
-def extract_skill(out) -> list[list[int],str]:
+def extract_skill(out,n_skills) -> list[list[int],str]:
     """exctract list of sem"""
     split_sentence="The list of skill use is:".lower()
     explanation_skill=out
@@ -93,4 +93,7 @@ def extract_skill(out) -> list[list[int],str]:
     isallint = all(isinstance(i, int) for i in skill)
     if not isallint:
         skill = []
+
+    skill =[1 if i in skill else 0 for i in range(n_skills)]
+
     return skill, explanation_skill

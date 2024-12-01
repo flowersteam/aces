@@ -10,6 +10,10 @@ from aces.environement.p3.utils import extract_skill, extract_solution, extract_
 from aces.code_sandbox import evaluate, pass_at_k
 import numpy as np
 import os
+from itertools import combinations
+from scipy.spatial.distance import cdist
+
+
 os.environ["TOKENIZERS_PARALLELISM"] = "true"
 #TODO inherite from base ACES class with common stuff
 class ACES_p3:
@@ -17,13 +21,16 @@ class ACES_p3:
         # initialize LLM client
         self.llm_args = LLMArguments
         self.skill_list = skill_list
-
+        self.id = 0
         self.init_llm()
         # initialize environment
         self.aces_args = AcesArguments 
         self.initialize_environment()
         self.archive = []
+        
+        self.niche_to_idx_archive = {}
         self.semantic_descriptors = []
+        self.rng = np.random.default_rng(self.aces_args.seed)
 
     def init_llm(self,) -> None:
         """init LLM client"""
@@ -56,7 +63,24 @@ class ACES_p3:
         list_p3 = self.evaluate_python_code(list_p3)
         ## generate description
         list_p3 = self.generate_description(list_p3)
-        self.archives = list_p3
+        # rm_fitness_condition = True because initial puzzles should be solvable
+        self.archives = self.update_archive(list_p3, rm_fitness_condition = True)
+
+    
+    def update_archive(self,list_p3: list[P3], rm_fitness_condition = False):
+        """update archive with valid puzzles"""
+        for p in list_p3:
+            condition_add_individual = p.fitness != -np.inf
+            if rm_fitness_condition:
+                condition_add_individual = True
+            if condition_add_individual:
+                niche_idx = tuple(p.emb)
+                id_archive = len(self.archives)
+                self.archives.append(p)
+                if not niche_idx in self.niche_to_idx_archive:
+                    self.niche_to_idx_archive[niche_idx] = []
+                self.niche_to_idx_archive[niche_idx].append(id_archive)
+
 
     def formating_chat_prompt(self, list_prompt_str: list[str]) -> list[list[dict]]:
         """Format list of prompt string to chat prompt"""
@@ -143,7 +167,7 @@ class ACES_p3:
         list_skills = self.llm.multiple_completion(list_prompt_chat)
         assert len(list_skills) == len(puzzles)
         for i in range(len(puzzles)):
-            skill, explanation_skill = extract_skill(list_skills[i].response[0])
+            skill, explanation_skill = extract_skill(list_skills[i].response[0],skill=len(self.skill_list))
             puzzles[i].emb = skill
             puzzles[i].explanation_emb = explanation_skill
             # puzzle[i].phenotype = skill
@@ -160,6 +184,77 @@ class ACES_p3:
             puzzles[i].description = list_description[i].response[0]
         return puzzles
     
+    def sample_goal(self,):
+        n_skills = len(self.skill_list)
+        skills = list(range(1, n_skills+1))
+        # Generate all combinations of up to 5 skills
+        skill_combinations = set()
+        for r in range(1, self.aces_args.max_descriptor_targeted+1):  # From 1 skill to 5 skills
+            skill_combinations.update(combinations(skills, r))
+        skill_combinations = list(skill_combinations)
+        match self.aces_args.mode_sampling_goal:
+            case 'uniform':
+                idx = self.rng.choice(len(skill_combinations))
+                out = skill_combinations[idx]
+                skill_targeted = [1 if i in out else 0 for i in range(n_skills)]
+            case 'smart':
+                # TODO: verify smart is working
+                all_emb = list(self.niche_to_idx_archive.keys())
+                all_emb = np.array([list(i) for i in all_emb]) # list of all explored niches
+                
+                skill_combinations_bin = [[1 if i in vec else 0 for i in range(n_skills)] for vec in skill_combinations] #list of all possible niches 
+                
+                #compute distance between all possible niche and all explored niches
+                out=cdist(skill_combinations_bin, all_emb, metric='cityblock') 
+                density=(out==1).sum(axis=1) # find every niches within a distance of 1
+                density=density*(out.min(axis=1)!=0) # remove already explored niches (sampling weight = 0)
+                norm= np.sum(density)
+                if norm == 0.:
+                    norm=1
+                density_norm=density/norm
+
+                idx_niches_sampled=np.random.choice(len(skill_combinations_bin),p=density_norm)
+                binary_vectors_sampled=skill_combinations_bin[idx_niches_sampled]
+                target_skill=list(binary_vectors_sampled)
+                target_skill = [int(element) for element in target_skill]
+                return target_skill
+            case 'none':
+                skill_targeted = []
+        return skill_targeted
+
+    def sample_goal_with_examples(self):
+        goal = self.sample_goal()
+        list_archive_index = []
+        
+        all_emb = list(self.niche_to_idx_archive.keys())
+        all_emb = np.array([list(i) for i in all_emb])
+
+        list_coord_niches_sampled = []
+        
+        # compute distance between all cells explored and the target cell
+        dists = cdist([goal], all_emb)[0]
+
+        # shuffle indices to have true uniform sampling of closest niches
+        # (otherwise, if two niches are at the same distance, the first one will be always sampled)
+        shuffled_indices = np.arange(len(dists))
+        np.random.shuffle(shuffled_indices)
+        nearest_niches = shuffled_indices[np.argsort(dists[shuffled_indices])]
+        
+        for idx in nearest_niches:
+            niche_idx = list(self.niche_to_idx_archive.keys())[idx]
+            if not(niche_idx in list_coord_niches_sampled):
+                list_coord_niches_sampled.append(niche_idx)
+                archive_indexs = self.sample_examples_from_niche(niche_idx)
+                list_archive_index.append(archive_indexs)
+            if len(list_archive_index)>=self.aces_args.n_fewshot_examples:
+                break
+        list_few_shot_example_phenotypes = [self.archive[idx] for idx in list_archive_index]
+        return (list_few_shot_example_phenotypes, goal)
+
+    def sample_examples_from_niche(self,niche_idx) -> int:
+        """Sample one example from a niche"""
+        #TODO:
+
     def explore(self, num_iterations: int):
         for _ in range(num_iterations):
             # Generate novel target in semantic space
@@ -202,7 +297,11 @@ if __name__ == '__main__':
         environement_name : str = field( default = "p3", metadata={"help": "environment name"})
         path_archive : str = field( default = "/home/flowers/work/aces/aces/environement/p3/preprocess_p3_emb_dedup_puzzles.json", metadata={"help": "path to the archive"})
         num_solutions: int = field( default = 2, metadata={"help": "number of solutions to generate to compute the difficulty score"})
-        
+        batch_size: int = field( default = 2, metadata={"help": "number of puzzles to create per generation"})
+        n_fewshot_examples: int = field( default = 3, metadata={"help": "number of example in context" })
+        max_descriptor_targeted: int = field( default = 5, metadata={"help": "number of max descriptor to target (at most `max_descriptor_targeted` semantic descriptor sample as goal)"})
+        mode_sampling_goal: int = field( default = "uniform", metadata={"help": "['uniform','smart','none'], uniform sample goal uniformely, smart: sample unexplored goal close that are within 1 of distance of already explored goal in the semantic space"})
+        seed: int = field(default=0)
     @dataclass
     class QdArguments:
         """
