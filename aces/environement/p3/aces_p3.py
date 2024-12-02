@@ -472,7 +472,7 @@ if __name__ == '__main__':
         name_experience: str = field( default = "test", metadata={"help": "name of the experience (use for saving)"})
         n_generation: int = field( default = 10, metadata={"help": "number of generation to run"})
 
-        num_solutions: int = field( default = 1, metadata={"help": "number of solutions to generate to compute the difficulty score"})
+        num_solutions: int = field( default = 10, metadata={"help": "number of solutions to generate to compute the difficulty score"})
         batch_size: int = field( default = 10, metadata={"help": "number of puzzles to create per generation"})
         n_fewshot_examples: int = field( default = 3, metadata={"help": "number of example in context" })
         max_descriptor_targeted: int = field( default = 5, metadata={"help": "number of max descriptor to target (at most `max_descriptor_targeted` semantic descriptor sample as goal)"})
