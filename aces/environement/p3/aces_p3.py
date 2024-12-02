@@ -328,8 +328,8 @@ class ACES_p3:
         if size_niche == 0:
             raise ValueError('Empty niche')
         if size_niche == 1:
-            archive_index = self.rng.choice(self.niche_to_idx_archive[niche_idx])
-            archive_index = int(archive_index)
+            # archive_index = self.rng.choice(self.niche_to_idx_archive[niche_idx])
+            archive_index = int(self.niche_to_idx_archive[niche_idx][0])
             return archive_index
         match self.aces_args.sampling_strategy_examples_from_niche:
             case 'uniform':
