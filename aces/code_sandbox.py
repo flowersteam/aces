@@ -82,7 +82,7 @@ def evaluate(list_codes,list_task_id=None,entry_point="test",parallel=None,min_t
         n_workers = max(1, 3 * multiprocessing.cpu_count() //4 )
     else:
         n_workers = parallel
-    print(n_workers)
+    # print(n_workers)
     results = {
         "date": datetime.now().strftime("%Y-%m-%d %H:%M"),
         "eval": {},
