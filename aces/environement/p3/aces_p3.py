@@ -76,7 +76,7 @@ class ACES_p3:
                 with open(self.aces_args.path_archive, 'rb') as f:
                     list_codes = pickle.load(f)
 
-            self.idx_generation = -1
+            self.idx_generation = 0
             list_code_formated = []
 
             # generate semantic descriptor
@@ -191,7 +191,8 @@ class ACES_p3:
             if c==0:
                 fitness = -np.inf
             else:
-                fitness = pass_at_k(n=number_solution, c=c, k=k)
+                #fitnes equal to - pass@1
+                fitness = - pass_at_k(n=number_solution, c=c, k=k)
                 list_correct_solution = [all_solution[i] for i in range(len(all_solution)) if all_solution_correct[i]]
                 id_rd = random.randint(0,len(list_correct_solution)-1)
                 puzzles[task_id].program_str = list_correct_solution[id_rd]
@@ -253,7 +254,7 @@ class ACES_p3:
                 if "def f" in split_puzzles[idx] and "def g" in split_puzzles[idx]:
                     split_puzzles[idx] = split_puzzles[idx].split("\nassert f(")[0]
                     split_puzzles[idx] = split_puzzles[idx] + "\nassert f(g()) == True\n"
-                    new_p3 = P3(split_puzzles[idx],target_skills=list_goal[id_puzzle],puzzles_id_fewshot=list_few_shot_ex_id[id_puzzle])
+                    new_p3 = P3(split_puzzles[idx],target_skills=list_goal[id_puzzle],puzzles_id_fewshot=list_few_shot_ex_id[id_puzzle], idx_generation=self.idx_generation)
                     list_new_p3.append(new_p3)
                     
         return list_new_p3
