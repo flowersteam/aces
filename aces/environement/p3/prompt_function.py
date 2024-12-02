@@ -13,6 +13,7 @@ prompt_aces, prompt_aces_elm,
 prompt_gen_description, prompt_skills_labeling,
 base_persona_code, instruction_solve_puzzle
 )
+from aces.environement.p3.p3_genotype import P3
 
 
 # add Set Operations and Hashing
@@ -108,21 +109,22 @@ def get_prompt_description_p3(puzzle):
 
 
 def get_programming_puzzles_prompt(
-        list_few_shot_example : List[str],
+        list_few_shot_example : List[P3],
         skill_targeted: Optional[List[int]]=None,
-        n_fewshot_ex=3,
-        aces_elm_mode=False,
+        puzzle_generation_strategy = "aces",
         difficulty_range=(90,100),
+
     ):
     """
     should change that to list_few_shot_example from list to Phenotype type
     skill_targeted list of binary vector [(0/1)]^n_skills indicating if the skill is targeted or not
-    remove n_fewshot_ex
     """
     extra_prompt=""
-    prompt = copy.deepcopy(prompt_aces)
-    if aces_elm_mode:
-        prompt = copy.deepcopy(prompt_aces_elm)
+    prompt = prompt_aces
+    if puzzle_generation_strategy == "aces":
+        prompt = prompt_aces
+    elif puzzle_generation_strategy == "aces_elm":
+        prompt = prompt_aces_elm
 
     # if wizard_coder:
     #     prompt = copy.deepcopy(prompt_wizard_coder)
@@ -132,11 +134,9 @@ def get_programming_puzzles_prompt(
         list_few_shot_example = [list_few_shot_example]
     if all(isinstance(x, str) for x in list_few_shot_example):
         raise NameError("should be phenotype not str") 
-
-    puzzles = [puzz for puzz in list_few_shot_example[:n_fewshot_ex]]
     
     examples = ""
-    for i, puzzle in enumerate(puzzles):
+    for i, puzzle in enumerate(list_few_shot_example):
         puzzle_description = puzzle.description 
         prompt_cot_fitness = ""
         skill_puzzle_i=""
@@ -156,7 +156,7 @@ def get_programming_puzzles_prompt(
 
     extra_prompt += f"You should aim to generate puzzles with a Difficulty score between {difficulty_range[0]} and {difficulty_range[1]} out of 100."
     prompt = prompt.format(examples=examples,skill_target=skill_target,extra=extra_prompt)
-    # prompt += prompt2add
+
     return prompt
 
 

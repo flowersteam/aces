@@ -31,7 +31,7 @@ class P3:
         self.is_valid_explanation = is_valid_explanation
         self.all_solution = all_solution
         self.all_solution_correct = all_solution_correct
-        self.unique_id = unique_id
+        self.id = unique_id
         self.phenotype = emb   
 
     def __str__(self) -> str:
