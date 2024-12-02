@@ -12,7 +12,7 @@ import numpy as np
 import os
 from itertools import combinations
 from scipy.spatial.distance import cdist
-
+import pickle
 
 os.environ["TOKENIZERS_PARALLELISM"] = "true"
 #TODO inherite from base ACES class with common stuff
@@ -21,16 +21,18 @@ class ACES_p3:
         # initialize LLM client
         self.llm_args = LLMArguments
         self.skill_list = skill_list
-        self.id = 0
+        self.unique_id = 0
+        self.idx_generation = 0
+        self.archive = []
+        self.fitnesses = []
+        self.niche_to_idx_archive = {}
+        self.semantic_descriptors = []
+
         self.init_llm()
         # initialize environment
         self.aces_args = AcesArguments 
         self.initialize_environment()
-        self.archive = []
         
-        self.niche_to_idx_archive = {}
-        self.semantic_descriptors = []
-        self.fitnesses = []
         self.rng = np.random.default_rng(self.aces_args.seed)
 
 
@@ -65,26 +67,44 @@ class ACES_p3:
         print("LLM client initialized")
     
     def initialize_environment(self) -> None:
-        with open(self.aces_args.path_archive, 'r') as f:
-            self.archives = json.load(f)
-        list_p3 = []
+        if self.aces_args.path_checkpoint_archive == "":
+            print("load initial archive: ", self.aces_args.path_archive)
+            if "json" in self.aces_args.path_archive:
+                with open(self.aces_args.path_archive, 'r') as f:
+                    list_codes = json.load(f)
+            else:
+                with open(self.aces_args.path_archive, 'rb') as f:
+                    list_codes = pickle.load(f)
+            self.idx_generation = -1
+            list_code_formated = []
 
-        # generate semantic descriptor
-        for p in self.archives:
-            list_p3.append(P3(program_str = p['program_str']))
-        list_p3 = self.generate_semantic_descriptors(list_p3)
-        
-        # generate dfficulty
-        ## generate multiple solutions
-        list_p3 = self.generate_multiple_solutions(list_p3)
-        ## evaluate python code
-        list_p3 = self.evaluate_python_code(list_p3)
-        ## generate description
-        list_p3 = self.generate_description(list_p3)
-        # rm_fitness_condition = True because initial puzzles should be solvable
-        self.update_archive(list_p3, rm_fitness_condition = True)
+            # generate semantic descriptor
+            for p in list_codes:
+                list_code_formated.append(P3(program_str = p['program_str'], idx_generation = self.idx_generation))
+            list_codes = self.generate_semantic_descriptors(list_code_formated)
+            
+            # generate dfficulty
+            ## generate multiple solutions
+            list_codes = self.generate_multiple_solutions(list_codes)
+            ## evaluate python code
+            list_codes = self.evaluate_python_code(list_codes)
+            ## generate description
+            list_codes = self.generate_description(list_codes)
+            # rm_fitness_condition = True because initial puzzles should be solvable
+            self.update_archive(list_codes, rm_fitness_condition = True)
+        else:
+            print("resume experiment from the given a archive checkpoint: ", self.aces_args.path_checkpoint_archive)
+            if "json" in self.aces_args.path_checkpoint_archive:
+                with open(self.aces_args.path_checkpoint_archive, 'r') as f:
+                    list_codes = json.load(f)
+            else:
+                with open(self.aces_args.path_checkpoint_archive, 'rb') as f:
+                    list_codes = pickle.load(f)
 
-    
+            self.idx_generation = list_codes[-1].idx_generation
+            self.unique_id = list_codes[-1].unique_id + 1
+            self.update_archive(list_codes)
+            
     def update_archive(self,list_p3: list[P3], rm_fitness_condition = False):
         """update archive with valid puzzles"""
         for p in list_p3:
@@ -93,14 +113,14 @@ class ACES_p3:
                 condition_add_individual = True
             if condition_add_individual:
                 niche_idx = tuple(p.emb)
-                p.id = self.id
-                self.archives.append(p)
+                if self.aces_args.path_checkpoint_archive == "":
+                    p.unique_id = self.unique_id
+                self.archive.append(p)
                 self.fitnesses.append(p.fitness)
                 if not niche_idx in self.niche_to_idx_archive:
                     self.niche_to_idx_archive[niche_idx] = []
-                self.niche_to_idx_archive[niche_idx].append(self.id)
-                self.id +=1
-                
+                self.niche_to_idx_archive[niche_idx].append(p.unique_id)
+                self.unique_id +=1
 
 
     def formating_chat_prompt(self, list_prompt_str: list[str]) -> list[list[dict]]:
@@ -188,7 +208,7 @@ class ACES_p3:
         list_skills = self.llm.multiple_completion(list_prompt_chat)
         assert len(list_skills) == len(puzzles)
         for i in range(len(puzzles)):
-            skill, explanation_skill = extract_skill(list_skills[i].response[0],skill=len(self.skill_list))
+            skill, explanation_skill = extract_skill(list_skills[i].response[0],n_skills=len(self.skill_list))
             puzzles[i].emb = skill
             puzzles[i].explanation_emb = explanation_skill
             # puzzle[i].phenotype = skill
@@ -211,11 +231,11 @@ class ACES_p3:
         list_few_shot_ex_id = []
         list_goal = []
         for (list_few_shot_example_phenotypes, goal) in list_goal_with_examples:
-            list_few_shot_ex_id.append([ex["id"] for ex in list_few_shot_example_phenotypes])
+            list_few_shot_ex_id.append([ex["unique_id"] for ex in list_few_shot_example_phenotypes])
             list_goal.append(goal)
             prompt = get_programming_puzzles_prompt(list_few_shot_example_phenotypes,goal,
                         puzzle_generation_strategy = self.aces_args.puzzle_generation_strategy,
-                        puzzle_generation_strategy=difficulty_range)
+                        difficulty_range = difficulty_range)
             
             list_prompt.append(prompt)
 
@@ -385,8 +405,21 @@ class ACES_p3:
         archive_index = int(archive_index)
         return archive_index
 
-    def run(self, num_iterations: int):
-        for _ in range(num_iterations):
+    def save_archive(self):
+        base_path = self.aces_args.path_save + self.aces_args.name_experience +"_" + self.aces_args.seed + "/"
+        if not os.path.exists(base_path):
+            os.makedirs(base_path, exist_ok=True)
+
+        with open(base_path + f"generation_{self.generation_idx}.pkl", 'wb') as f:
+            pickle.dump(self.archive, f)
+        
+    def rm_incorrect_puzzles(self, list_p3: list[P3]) -> list[P3]:
+        """Remove incorrect puzzles"""
+        return [p for p in list_p3 if p.fitness != -np.inf]
+    
+    def run(self):
+        for id_iterations in range(self.aces_args.n_generation):
+            self.idx_generation += 1
             # Generate novel targets in semantic space
             # with some few shot examples that are close in the semantic space 
             list_goal_with_examples = self.sample_goal_with_examples()
@@ -396,11 +429,15 @@ class ACES_p3:
             list_p3 = self.generate_multiple_solutions(list_p3)
             ## evaluate python code
             list_p3 = self.evaluate_python_code(list_p3)
-            ## generate description
+
+            list_p3 = self.rm_incorrect_puzzles(list_p3)
+            # generate semantic descriptor
+            list_p3 = self.generate_semantic_descriptors(list_p3)
+            # generate description
             list_p3 = self.generate_description(list_p3)
             self.update_archive(list_p3)
-            #TODO: add save archive + debug
-            
+            if id_iterations % self.aces_args.save_every_n_generations == 0:
+                self.save_archive()
 
 if __name__ == '__main__':
     from dataclasses import dataclass, field
@@ -414,6 +451,10 @@ if __name__ == '__main__':
 
         environement_name : str = field( default = "p3", metadata={"help": "environment name"})
         path_archive : str = field( default = "/home/flowers/work/aces/aces/environement/p3/preprocess_p3_emb_dedup_puzzles.json", metadata={"help": "path to the archive"})
+        path_save: str = field( default = "/home/flowers/work/aces/save_data/", metadata={"help": "path to save the archive"})
+        name_experience: str = field( default = "/home/flowers/work/aces/save_data/", metadata={"help": "name of the experience (use for saving)"})
+        n_generation: int = field( default = 10, metadata={"help": "number of generation to run"})
+
         num_solutions: int = field( default = 2, metadata={"help": "number of solutions to generate to compute the difficulty score"})
         batch_size: int = field( default = 2, metadata={"help": "number of puzzles to create per generation"})
         n_fewshot_examples: int = field( default = 3, metadata={"help": "number of example in context" })
@@ -425,7 +466,9 @@ if __name__ == '__main__':
         puzzle_generation_strategy: str = field(default= "aces", metadata={"help":"startegy to generate new puzzle, choice: ['aces','aces_elm'] todo 'wizard_coder'"})
         difficulty_min_target: int = field(default = 90, metadata={"help":"difficulty min to target"})
         difficulty_max_target: int = field(default = 100, metadata={"help":"difficulty min to target"})
-
+        save_every_n_generations: int = field(default = 1, metadata={"help":"save archive every n generations"})
+        path_checkpoint_archive: str = field(default="", metadata={"help":"if != '' resume experiment from the given a archive checkpoint "})
+        
     @dataclass
     class QdArguments:
         """
@@ -500,3 +543,4 @@ if __name__ == '__main__':
     # model_args, data_args, training_args = parser.parse_args_into_dataclasses()#["--output_dir", "/home/flowers/work/hf/trained/"])
     aces_args, qd_args, llm_args = AcesArguments(), QdArguments(), LLMArguments()
     aces= ACES_p3(aces_args, llm_args)
+    aces.run()
