@@ -105,6 +105,7 @@ def get_completion_offline(llm,batch_prompt,cfg_generation,n=1):
                     allowed_token_ids=alowed_tokens
                     )
                 flag_judge=True
+    
     batch_prompt_formated = tokenizer.apply_chat_template(batch_prompt,tokenize=False,add_generation_prompt=True)
     outs = llm.generate(batch_prompt_formated,sampling_params)
     list_out_process=[]

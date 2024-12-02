@@ -75,6 +75,7 @@ class ACES_p3:
             else:
                 with open(self.aces_args.path_archive, 'rb') as f:
                     list_codes = pickle.load(f)
+
             self.idx_generation = -1
             list_code_formated = []
 
@@ -136,7 +137,8 @@ class ACES_p3:
         list_prompt_sol = []
         for p in puzzles:
             list_prompt_sol.append(prompt_solve_puzzle_given_f(p.program_str))
-        list_solutions = self.llm.multiple_completion(self.formating_chat_prompt(list_prompt_sol),n = self.aces_args.num_solutions)
+        list_prompt_sol_chat = self.formating_chat_prompt(list_prompt_sol)
+        list_solutions = self.llm.multiple_completion(list_prompt_sol_chat, n = self.aces_args.num_solutions)
         assert len(list_solutions) == len(puzzles)
         for id_puzzle in range(len(puzzles)):
             problem = puzzles[id_puzzle].program_str 
@@ -231,7 +233,7 @@ class ACES_p3:
         list_few_shot_ex_id = []
         list_goal = []
         for (list_few_shot_example_phenotypes, goal) in list_goal_with_examples:
-            list_few_shot_ex_id.append([ex["unique_id"] for ex in list_few_shot_example_phenotypes])
+            list_few_shot_ex_id.append([ex.unique_id for ex in list_few_shot_example_phenotypes])
             list_goal.append(goal)
             prompt = get_programming_puzzles_prompt(list_few_shot_example_phenotypes,goal,
                         puzzle_generation_strategy = self.aces_args.puzzle_generation_strategy,
@@ -241,6 +243,7 @@ class ACES_p3:
 
         list_prompt_chat = self.formating_chat_prompt(list_prompt)
         news_puzzles = self.llm.multiple_completion(list_prompt_chat)
+        news_puzzles = [p.response[0] for p in news_puzzles]
         #TODO: exctract puzzles + ...
         list_new_p3 = []
         
@@ -406,11 +409,11 @@ class ACES_p3:
         return archive_index
 
     def save_archive(self):
-        base_path = self.aces_args.path_save + self.aces_args.name_experience +"_" + self.aces_args.seed + "/"
+        base_path = self.aces_args.path_save + self.aces_args.name_experience +"_" + str(self.aces_args.seed) + "/"
         if not os.path.exists(base_path):
             os.makedirs(base_path, exist_ok=True)
 
-        with open(base_path + f"generation_{self.generation_idx}.pkl", 'wb') as f:
+        with open(base_path + f"generation_{self.idx_generation}.pkl", 'wb') as f:
             pickle.dump(self.archive, f)
         
     def rm_incorrect_puzzles(self, list_p3: list[P3]) -> list[P3]:
@@ -423,20 +426,33 @@ class ACES_p3:
             # Generate novel targets in semantic space
             # with some few shot examples that are close in the semantic space 
             list_goal_with_examples = self.sample_goal_with_examples()
+            print("generating new puzzles")
             list_p3 = self.generate_new_puzzles(list_goal_with_examples)
+            print(f"generation {self.idx_generation}:\n- {len(list_p3)} puzzles generated")
+            if len(list_p3) == 0:
+                print("no puzzle generated")
+                continue
+
             # generate dfficulty
             ## generate multiple solutions
+            print("generating multiple solutions")
             list_p3 = self.generate_multiple_solutions(list_p3)
             ## evaluate python code
+            print("evaluate solutions")
             list_p3 = self.evaluate_python_code(list_p3)
 
             list_p3 = self.rm_incorrect_puzzles(list_p3)
+            print(f"- {len(list_p3)} puzzles are correct")
+            if len(list_p3) == 0:
+                print("no correct puzzle generated")
+                continue
             # generate semantic descriptor
             list_p3 = self.generate_semantic_descriptors(list_p3)
             # generate description
             list_p3 = self.generate_description(list_p3)
             self.update_archive(list_p3)
-            if id_iterations % self.aces_args.save_every_n_generations == 0:
+            if (id_iterations+1) % self.aces_args.save_every_n_generations == 0:
+                print("saving archive")
                 self.save_archive()
 
 if __name__ == '__main__':
@@ -452,11 +468,11 @@ if __name__ == '__main__':
         environement_name : str = field( default = "p3", metadata={"help": "environment name"})
         path_archive : str = field( default = "/home/flowers/work/aces/aces/environement/p3/preprocess_p3_emb_dedup_puzzles.json", metadata={"help": "path to the archive"})
         path_save: str = field( default = "/home/flowers/work/aces/save_data/", metadata={"help": "path to save the archive"})
-        name_experience: str = field( default = "/home/flowers/work/aces/save_data/", metadata={"help": "name of the experience (use for saving)"})
+        name_experience: str = field( default = "test", metadata={"help": "name of the experience (use for saving)"})
         n_generation: int = field( default = 10, metadata={"help": "number of generation to run"})
 
-        num_solutions: int = field( default = 2, metadata={"help": "number of solutions to generate to compute the difficulty score"})
-        batch_size: int = field( default = 2, metadata={"help": "number of puzzles to create per generation"})
+        num_solutions: int = field( default = 1, metadata={"help": "number of solutions to generate to compute the difficulty score"})
+        batch_size: int = field( default = 10, metadata={"help": "number of puzzles to create per generation"})
         n_fewshot_examples: int = field( default = 3, metadata={"help": "number of example in context" })
         max_descriptor_targeted: int = field( default = 5, metadata={"help": "number of max descriptor to target (at most `max_descriptor_targeted` semantic descriptor sample as goal)"})
         mode_sampling_goal: int = field( default = "uniform", metadata={"help": "['uniform','smart','none'], uniform sample goal uniformely, smart: sample unexplored goal close that are within 1 of distance of already explored goal in the semantic space"})
@@ -487,7 +503,7 @@ if __name__ == '__main__':
         """
 
         model_name_or_path: str = field(
-            default="/home/flowers/work/hf/Qwen2.5-0.5B-Instruct",
+            default="/home/flowers/work/hf/Qwen2.5-Coder-3B-Instruct",
             metadata={"help": "Path to pretrained model or model identifier from huggingface.co/models"}
         )
         online: Optional[bool] = field(

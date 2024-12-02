@@ -140,7 +140,10 @@ def get_programming_puzzles_prompt(
         puzzle_description = puzzle.description 
         prompt_cot_fitness = ""
         skill_puzzle_i=""
-        prompt_cot_fitness = f"\n\n- Difficulty score: {int((puzzle.fitness+1)*100)} out of 100"
+        puzzle_fitness = puzzle.fitness
+        if puzzle_fitness == -np.inf:
+            puzzle_fitness = 0
+        prompt_cot_fitness = f"\n\n- Difficulty score: {int((puzzle_fitness+1)*100)} out of 100"
 
         skill_puzzle_i="\n\n- This puzzle has the following skills:"
         idx_skill_targeted = [idx for idx, val in enumerate(puzzle.emb) if val]
