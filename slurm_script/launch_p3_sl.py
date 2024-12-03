@@ -74,7 +74,7 @@ for model in list_model:
     if args.gpu:
         extra += f" --gpu {args.gpu}"
     extra+= f" --save_every_n_generations {args.save_every_n_generations}"    
-    model_id = args.model_name_or_path
+    model_id = model
     if "/" in model_id:
         model_id = model_id.split("/")[-1]
     job_name = f"ACES_P3_model-{model_id}"
