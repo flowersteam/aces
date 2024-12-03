@@ -80,7 +80,9 @@ for model in list_model:
     job_name = f"ACES_P3_model-{model_id}"
 
     slurmfile_path = f'run_{job_name}.slurm'
-    script = script_template.format(qos=qos,h=h,gpu=args.gpu,path_archive=args.path_archive, path_save=args.path_save, name_experience=args.name_experience, n_generation=args.n_generation, num_solutions=args.num_solutions, seed=args.seed, model_name_or_path=model, extra=extra, job_name=job_name)
+    name_experience= model_id+"_"+args.name_experience +"_nsolution-"+str(args.num_solutions)+ "_seed_"+str(args.seed)
+    name_experience 
+    script = script_template.format(qos=qos,h=h,gpu=args.gpu,path_archive=args.path_archive, path_save=args.path_save, name_experience=name_experience, n_generation=args.n_generation, num_solutions=args.num_solutions, seed=args.seed, model_name_or_path=model, extra=extra, job_name=job_name)
     if args.only_print:
         print(script)
         exit()
