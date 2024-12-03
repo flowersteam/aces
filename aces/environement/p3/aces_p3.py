@@ -48,6 +48,10 @@ class ACES_p3(ACES_base):
             list_codes = self.generate_multiple_solutions(list_codes)
             ## evaluate python code
             list_codes = self.evaluate_python_code(list_codes)
+            #check how many problem are solved
+            codes_valid = sum([np.isfinite(codes.fitness) for codes in list_codes])
+            print("valid codes in initial archive: ", codes_valid, " / ", len(list_codes))
+
             ## generate description
             list_codes = self.generate_description(list_codes)
             # rm_fitness_condition = True because initial puzzles should be solvable
