@@ -90,6 +90,7 @@ def get_completion_offline(llm,batch_prompt,cfg_generation,n=1):
         n=n,
         temperature=cfg_generation["temperature"],
         max_tokens=cfg_generation["max_tokens"],
+        min_p = cfg_generation["min_p"],
         )
     if "extra_body" in cfg_generation:
          if  "guided_choice" in cfg_generation["extra_body"]:

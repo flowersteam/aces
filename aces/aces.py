@@ -51,8 +51,8 @@ class ACES_base:
     def init_llm(self,) -> None:
         """init LLM client"""
         print("init LLM client")
-        cfg_generation ={"model": self.llm_args.model_name_or_path, "temperature": self.llm_args.temperature,  "max_tokens": self.llm_args.max_tokens}
-
+        cfg_generation ={"model": self.llm_args.model_name_or_path, "temperature": self.llm_args.temperature,"max_tokens": self.llm_args.max_tokens}
+        cfg_generation["min_p"] = self.llm_args.min_p
         self.llm = LLMClient(model = self.llm_args.model_name_or_path, 
                              cfg_generation = cfg_generation,
                              base_url = self.llm_args.base_url, 
@@ -146,7 +146,7 @@ class ACES_base:
 
     def generate_new_problems(self,list_goal_with_examples):
         """Generate new puzzles"""
-
+        raise NotImplementedError
     def sample_goals(self,):
         """
         Sample goals in the semantic space (combination of skills)
@@ -319,7 +319,7 @@ class ACES_base:
             # with some few shot examples that are close in the semantic space 
             list_goal_with_examples = self.sample_goal_with_examples()
             print("generating new goal")
-            list_codes = self.generate_new_puzzles(list_goal_with_examples)
+            list_codes = self.generate_new_problems(list_goal_with_examples)
             print(f"generation {self.idx_generation}:\n- {len(list_codes)} goal generated")
             if len(list_codes) == 0:
                 print("no puzzle generated")

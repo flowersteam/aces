@@ -6,7 +6,7 @@ import json
 from aces.environement.p3.p3_genotype import P3
 from aces.environement.p3.prompt_function import get_prompt_label_p3, get_prompt_description_p3, prompt_solve_puzzle_given_f, get_programming_puzzles_prompt
 from aces.environement.p3.skill_list import skill_list
-from aces.environement.p3.utils import extract_skill, extract_solution, extract_f
+from aces.environement.p3.utils import extract_skill, extract_solution, extract_f, extract_function_name, rm_given_function
 from aces.code_sandbox import evaluate, pass_at_k
 from aces.aces import ACES_base
 import numpy as np
@@ -19,27 +19,10 @@ os.environ["TOKENIZERS_PARALLELISM"] = "true"
 #TODO inherite from base ACES class with common stuff
 class ACES_p3(ACES_base):
     def __init__(self, AcesArguments: dataclass, LLMArguments : dataclass, *args, **kwargs):
-        # initialize LLM client
-        # self.llm_args = LLMArguments
-        # self.skill_list = skill_list
-        # self.unique_id = 0
-        # self.idx_generation = 0
-        # self.archive = []
-        # self.fitnesses = []
-        # self.niche_to_idx_archive = {}
-        # self.semantic_descriptors = []
-
-        # self.init_llm()
-        # # initialize environment
-        # self.aces_args = AcesArguments 
-        # self.initialize_environment()
-        
-        # self.rng = np.random.default_rng(self.aces_args.seed)
-
         super().__init__(AcesArguments=AcesArguments, LLMArguments=LLMArguments, *args, **kwargs)
     
     def init_skill_list(self):
-        
+        #TODO: automatically generate skill list given initial puzzles
         self.skill_list = skill_list
 
     def initialize_environment(self) -> None:
@@ -47,7 +30,7 @@ class ACES_p3(ACES_base):
             print("load initial archive: ", self.aces_args.path_archive)
             if "json" in self.aces_args.path_archive:
                 with open(self.aces_args.path_archive, 'r') as f:
-                    list_codes = json.load(f)
+                    list_codes = json.load(f)[:10]
             else:
                 with open(self.aces_args.path_archive, 'rb') as f:
                     list_codes = pickle.load(f)
@@ -117,7 +100,15 @@ class ACES_p3(ACES_base):
 
     def process_solutions(self, solution: str, problem: str) -> str: 
         """Process solution and return full puzzle (f+g)"""
-        puzzle = extract_f(problem) + "\n" + extract_solution(solution)
+        just_problem = extract_f(problem) 
+        solution = extract_solution(solution)
+        name_functions_problem = extract_function_name(problem)
+        name_function_solution = extract_function_name(solution)
+        for name in name_function_solution:
+            if name not in name_functions_problem:
+                # remove the function as it shouldn't overwrite the original function
+                solution = rm_given_function(solution, name_functions_problem)
+        puzzle = just_problem + "\n" + solution
         puzzle = puzzle.split("\nassert f")
         puzzle = puzzle[0] + "\nassert f(g()) == True\n"
         return puzzle
@@ -223,10 +214,7 @@ class ACES_p3(ACES_base):
                     split_puzzles[idx] = split_puzzles[idx] + "\nassert f(g()) == True\n"
                     new_p3 = P3(split_puzzles[idx],target_skills=list_goal[id_puzzle],puzzles_id_fewshot=list_few_shot_ex_id[id_puzzle], idx_generation=self.idx_generation)
                     list_new_p3.append(new_p3)
-                    
         return list_new_p3
-
-
 
 if __name__ == '__main__':
     from dataclasses import dataclass, field
@@ -250,11 +238,11 @@ if __name__ == '__main__':
         max_descriptor_targeted: int = field( default = 5, metadata={"help": "number of max descriptor to target (at most `max_descriptor_targeted` semantic descriptor sample as goal)"})
         mode_sampling_goal: int = field( default = "uniform", metadata={"help": "['uniform','smart','none'], uniform sample goal uniformely, smart: sample unexplored goal close that are within 1 of distance of already explored goal in the semantic space"})
         seed: int = field(default=0)
-        sampling_strategy_examples_from_niche: str = field(default='uniform', metadata={"help": "sampling strategy to sample examples from a niche, choice: 'uniform','prob_best_5','soft_normalised'; need to explain difference"})
-        temperature_sampling_strategy_examples_from_niche: float = field(default= 1., metadata={"help": "temperature softmax to sample example given their fitness given a niche"})
-        puzzle_generation_strategy: str = field(default= "aces", metadata={"help":"startegy to generate new puzzle, choice: ['aces','aces_elm'] todo 'wizard_coder'"})
-        difficulty_min_target: int = field(default = 90, metadata={"help":"difficulty min to target"})
-        difficulty_max_target: int = field(default = 100, metadata={"help":"difficulty min to target"})
+        sampling_strategy_examples_from_niche: str = field(default='soft_normalised', metadata={"help": "sampling strategy to sample examples from a niche, choice: 'uniform','prob_best_5','soft_normalised'; need to explain difference"})
+        temperature_sampling_strategy_examples_from_niche: float = field(default= 0.2, metadata={"help": "temperature softmax to sample example given their fitness given a niche"})
+        puzzle_generation_strategy: str = field(default= "aces_elm", metadata={"help":"startegy to generate new puzzle, choice: ['aces','aces_elm'] todo 'wizard_coder'"})
+        difficulty_min_target: int = field(default = 90, metadata={"help":"difficulty min to target /100"})
+        difficulty_max_target: int = field(default = 100, metadata={"help":"difficulty min to target /100"})
         save_every_n_generations: int = field(default = 1, metadata={"help":"save archive every n generations"})
         path_checkpoint_archive: str = field(default="", metadata={"help":"if != '' resume experiment from the given a archive checkpoint "})
         
@@ -303,16 +291,17 @@ if __name__ == '__main__':
                 "help": "number of gpus to use (vllm)"
             },
         )
-        cfg_generation : Optional[bool] = field(
-            default = False,
-            metadata={
-                "help": "use cfg generation"
-            },
-        ),
+
         temperature: Optional[float] = field(
             default = 1.0,
             metadata={
                 "help": "temperature"
+            },
+        )
+        min_p: Optional[float] = field(
+            default = 0.05,
+            metadata={
+                "help": "min_p"
             },
         )
         max_tokens: Optional[int] = field(

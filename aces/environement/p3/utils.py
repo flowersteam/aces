@@ -9,6 +9,29 @@ def find_first_argument_of_first_function(code) -> str:
             # print(f"The first argument of the function '{node.name}' is: {first_arg}")
             return first_arg
         
+def extract_function_name(code) -> str:
+    parsed_code = ast.parse(code)
+
+    # Extract function names using list comprehension
+    function_names = [node.name for node in parsed_code.body if isinstance(node, ast.FunctionDef)]
+    return function_names
+
+def rm_given_function(code, list_function_name):
+        # Parse the solution code to an AST
+    solution_ast = ast.parse(code)
+
+    # Filter out functions from the code that are in the list_function_name
+    filtered_body = [
+        node for node in solution_ast.body
+        if not isinstance(node, ast.FunctionDef) or node.name not in list_function_name
+    ]
+    # Create a new module with the filtered body
+    new_solution_ast = ast.Module(body=filtered_body, type_ignores=[])
+
+    # Convert the AST back to source code
+    new_solution_code = ast.unparse(new_solution_ast)
+    return new_solution_code
+
 def extract_f(code):
     return code.split("def g")[0].strip()
 
