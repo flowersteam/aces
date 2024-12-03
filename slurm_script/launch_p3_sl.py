@@ -21,7 +21,7 @@ parser.add_argument("--save_every_n_generations", type=int, default=5)
 
 args = parser.parse_args()
 
-if args.long_script:
+if args.long:
     qos = "#SBATCH --qos=qos_gpu_h100-t4"
     h = 64
 else:
