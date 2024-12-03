@@ -107,7 +107,10 @@ class ACES_base:
         for code in inital_codes:
             condition_add_individual = code.fitness != -np.inf
             if rm_fitness_condition:
+                # remove fitness condition when initializing the archive
                 condition_add_individual = True
+                if code.fitness == -np.inf:
+                    code.fitness = 0 #if it was unsolved give max fitness
             if condition_add_individual:
                 niche_idx = tuple(code.emb)
                 if self.aces_args.path_checkpoint_archive == "":
