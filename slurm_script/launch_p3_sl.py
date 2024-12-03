@@ -34,7 +34,7 @@ script_template="""#!/bin/bash
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=1
 #SBATCH --gres=gpu:{gpu}
-#SBATCH --cpus-per-task=48
+#SBATCH --cpus-per-task={cpu}
 {qos}
 #SBATCH --hint=nomultithread
 #SBATCH --time={h}:00:00
@@ -63,7 +63,7 @@ python launch_p3.py --path_archive {path_archive} --path_save {path_save} --name
 # export WORLD_SIZE=1
 
 
-
+cpu=max(24*args.gpu,96)
 # for id_part in [1, 2, 3]:
 base_path_model="/lustre/fsn1/projects/rech/imi/uqv82bm/hf/"
 
@@ -85,7 +85,7 @@ for model in list_model:
 
     slurmfile_path = f'run_{job_name}.slurm'
     name_experience= model_id+"_"+args.name_experience +"_nsolution-"+str(args.num_solutions)+ "_seed_"+str(args.seed)
-    script = script_template.format(qos=qos,h=h,gpu=args.gpu,path_archive=args.path_archive, path_save=args.path_save, name_experience=name_experience, n_generation=args.n_generation, num_solutions=args.num_solutions, seed=args.seed, model_name_or_path=model, extra=extra, job_name=job_name)
+    script = script_template.format(qos=qos,h=h,gpu=args.gpu,cpu=cpu,path_archive=args.path_archive, path_save=args.path_save, name_experience=name_experience, n_generation=args.n_generation, num_solutions=args.num_solutions, seed=args.seed, model_name_or_path=model, extra=extra, job_name=job_name)
     if args.only_print:
         print(script)
         exit()
