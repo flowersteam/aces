@@ -10,8 +10,10 @@ parser.add_argument("--num_solutions", type=int, default=100)
 parser.add_argument("--seed", type=int, default=0)
 parser.add_argument("--model_name_or_path", type=str, default="model_sweep")
 parser.add_argument("--path_checkpoint_archive", type=str, default="")
-parser.add_argument("--gpu", type=int, default=2)
+parser.add_argument("--gpu", type=int, default=1)
 parser.add_argument("--only_print", action=argparse.BooleanOptionalAction, default=False)
+parser.add_argument("--swap_space", type=int, default=5)
+
 
 
 args = parser.parse_args()
@@ -24,7 +26,7 @@ script_template="""#!/bin/bash
 #SBATCH --job-name={job_name}
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=1
-#SBATCH --gres=gpu:2
+#SBATCH --gres=gpu:{gpu}
 #SBATCH --cpus-per-task=48
 
 #SBATCH --hint=nomultithread
@@ -65,10 +67,13 @@ for model in list_model:
     if args.gpu:
         extra += f" --gpu {args.gpu}"
     
-    job_name = f"ACES_P3_model-{args.model_name_or_path}"
+    model_id = args.model_name_or_path
+    if "/" in model_id:
+        model_id = model_id.split("/")[-1]
+    job_name = f"ACES_P3_model-{model_id}"
 
     slurmfile_path = f'run_{job_name}.slurm'
-    script = script_template.format(path_archive=args.path_archive, path_save=args.path_save, name_experience=args.name_experience, n_generation=args.n_generation, num_solutions=args.num_solutions, seed=args.seed, model_name_or_path=model, extra=extra, job_name=job_name)
+    script = script_template.format(gpu=args.gpu,path_archive=args.path_archive, path_save=args.path_save, name_experience=args.name_experience, n_generation=args.n_generation, num_solutions=args.num_solutions, seed=args.seed, model_name_or_path=model, extra=extra, job_name=job_name)
     if args.only_print:
         print(script)
         exit()

@@ -319,6 +319,12 @@ if __name__ == '__main__':
                 "help": "max context size"
             },
         )
+        swap_space: Optional[int] = field(
+            default=5,
+            metadata={
+                "help": "swap space (RAM memory for cache)"
+            }
+        )
 
     # parser = HfArgumentParser((AcesArguments,QdArguments,LLMArguments))
     # model_args, data_args, training_args = parser.parse_args_into_dataclasses()#["--output_dir", "/home/flowers/work/hf/trained/"])

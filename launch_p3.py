@@ -89,7 +89,12 @@ class LLMArguments:
             "help": "max context size"
         },
     )
-
+    swap_space: Optional[float] = field(
+        default=5,
+        metadata={
+            "help": "swap space (RAM memory for cache)"
+        }
+    )
 parser = HfArgumentParser((AcesArguments,LLMArguments))
 aces_args, llm_args = parser.parse_args_into_dataclasses()
 # aces_args, llm_args = AcesArguments(), LLMArguments()

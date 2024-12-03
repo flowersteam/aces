@@ -7,6 +7,7 @@ python launch_p3_sl.py \
 --seed 0 \
 --model_name_or_path "model_sweep" \
 --gpu 1 \
+--swap_space 25 \
 --only_print
 
 
@@ -15,7 +16,7 @@ python launch_p3_sl.py \
 --path_save /home/flowers/work/aces/save_data/ \
 --name_experience "p3_emb_dedup_puzzles" \
 --n_generation 200 \
---num_solutions 100 \
+--num_solutions 5 \
 --seed 0 \
 --model_name_or_path "/home/flowers/work/hf/Qwen2.5-Coder-3B-Instruct" \
 --gpu 1 \

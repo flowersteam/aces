@@ -59,7 +59,8 @@ class ACES_base:
                              api_key = self.llm_args.api_key, 
                              online = self.llm_args.online, 
                              gpu = self.llm_args.gpu,
-                             max_model_length = self.llm_args.max_model_length)
+                             max_model_length = self.llm_args.max_model_length,
+                             swap_space = self.llm_args.swap_space )
         print("LLM client initialized")
     
     def initialize_environment(self) -> None:
@@ -346,6 +347,6 @@ class ACES_base:
             # generate description
             list_codes = self.generate_description(list_codes)
             self.update_archive(list_codes)
-            if (id_iterations+1) % self.aces_args.save_every_n_generations == 0:
+            if (id_iterations) % self.aces_args.save_every_n_generations == 0:
                 print("saving archive")
                 self.save_archive()

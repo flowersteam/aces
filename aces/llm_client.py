@@ -16,7 +16,7 @@ class Response:
 
 
 class LLMClient:
-    def __init__(self, model: str, cfg_generation: dict, base_url: str, api_key: str, online: bool = False, gpu=1, max_model_length=20000):
+    def __init__(self, model: str, cfg_generation: dict, base_url: str, api_key: str, online: bool = False, gpu=1, max_model_length=20000,swap_space=5):
         self.model_path = model
         self.cfg_generation = cfg_generation
         self.base_url = base_url
@@ -25,6 +25,8 @@ class LLMClient:
         self.online = online
         self.gpu = gpu
         self.max_model_length = max_model_length
+        self.swap_space = swap_space
+        
 
         if online:
             self.init_client()
@@ -40,7 +42,7 @@ class LLMClient:
             raise Exception("Server is down or unreachable")
 
     def init_offline_model(self):
-        self.llm = LLM(self.model_path, tensor_parallel_size = self.gpu, max_model_len=self.max_model_length, enable_prefix_caching=True)
+        self.llm = LLM(self.model_path, tensor_parallel_size = self.gpu, max_model_len=self.max_model_length, enable_prefix_caching=True,swap_space=self.swap_space)
          
 
     def multiple_completion(self, batch_prompt,judge=False,guided_choice=["1","2"],n=1):
