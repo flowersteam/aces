@@ -30,7 +30,7 @@ class ACES_p3(ACES_base):
             print("load initial archive: ", self.aces_args.path_archive)
             if "json" in self.aces_args.path_archive:
                 with open(self.aces_args.path_archive, 'r') as f:
-                    list_codes = json.load(f)
+                    list_codes = json.load(f)[:10]
             else:
                 with open(self.aces_args.path_archive, 'rb') as f:
                     list_codes = pickle.load(f)
@@ -106,7 +106,7 @@ class ACES_p3(ACES_base):
         just_problem = extract_f(problem) 
         solution = extract_solution(solution)
         try:
-            name_functions_problem = extract_function_name(problem)
+            name_functions_problem = extract_function_name(just_problem)
             solution = rm_given_function(solution, name_functions_problem)
         except:
             #solution is not ast parsable so it is incorrect
