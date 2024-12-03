@@ -13,13 +13,20 @@ parser.add_argument("--path_checkpoint_archive", type=str, default="")
 parser.add_argument("--gpu", type=int, default=1)
 parser.add_argument("--only_print", action=argparse.BooleanOptionalAction, default=False)
 parser.add_argument("--swap_space", type=int, default=5)
+parser.add_argument("--long", action=argparse.BooleanOptionalAction, default=False)
+parser.add_argument("--save_every_n_generations", type=int, default=5)
+
 
 
 
 args = parser.parse_args()
 
-
-
+if args.long_script:
+    qos = "#SBATCH --qos=qos_gpu_h100-t4"
+    h = 64
+else:
+    qos= ""
+    h=20
 script_template="""#!/bin/bash
 #SBATCH --account=imi@h100
 #SBATCH -C h100
@@ -28,9 +35,9 @@ script_template="""#!/bin/bash
 #SBATCH --ntasks-per-node=1
 #SBATCH --gres=gpu:{gpu}
 #SBATCH --cpus-per-task=48
-
+{qos}
 #SBATCH --hint=nomultithread
-#SBATCH --time=20:00:00
+#SBATCH --time={h}:00:00
 #SBATCH --output=./out/{job_name}-%A.out
 #SBATCH --error=./out/{job_name}-%A.out
 # set -x
@@ -66,14 +73,14 @@ for model in list_model:
         extra += f' --path_checkpoint_archive {args.path_checkpoint_archive}'
     if args.gpu:
         extra += f" --gpu {args.gpu}"
-    
+    extra+= f" --save_every_n_generations {args.save_every_n_generations}"    
     model_id = args.model_name_or_path
     if "/" in model_id:
         model_id = model_id.split("/")[-1]
     job_name = f"ACES_P3_model-{model_id}"
 
     slurmfile_path = f'run_{job_name}.slurm'
-    script = script_template.format(gpu=args.gpu,path_archive=args.path_archive, path_save=args.path_save, name_experience=args.name_experience, n_generation=args.n_generation, num_solutions=args.num_solutions, seed=args.seed, model_name_or_path=model, extra=extra, job_name=job_name)
+    script = script_template.format(qos=qos,h=h,gpu=args.gpu,path_archive=args.path_archive, path_save=args.path_save, name_experience=args.name_experience, n_generation=args.n_generation, num_solutions=args.num_solutions, seed=args.seed, model_name_or_path=model, extra=extra, job_name=job_name)
     if args.only_print:
         print(script)
         exit()

@@ -30,7 +30,7 @@ class ACES_p3(ACES_base):
             print("load initial archive: ", self.aces_args.path_archive)
             if "json" in self.aces_args.path_archive:
                 with open(self.aces_args.path_archive, 'r') as f:
-                    list_codes = json.load(f)[:10]
+                    list_codes = json.load(f)
             else:
                 with open(self.aces_args.path_archive, 'rb') as f:
                     list_codes = pickle.load(f)
