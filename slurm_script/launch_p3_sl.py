@@ -51,8 +51,10 @@ limit coredumpsize 0
 export CORE_PATTERN=/dev/null
 
 
-conda deactivate
+
 conda activate vllm641
+export CUDA_VISIBLE_DEVICES={gpu}
+export WORLD_SIZE=1
 cd /lustre/fswork/projects/rech/imi/uqv82bm/aces/
 
 python launch_p3.py --path_archive {path_archive} --path_save {path_save} --name_experience {name_experience} --n_generation {n_generation} --num_solutions {num_solutions} --seed {seed} --model_name_or_path {model_name_or_path} {extra}
