@@ -102,12 +102,12 @@ class ACES_p3(ACES_base):
         """Process solution and return full puzzle (f+g)"""
         just_problem = extract_f(problem) 
         solution = extract_solution(solution)
-        name_functions_problem = extract_function_name(problem)
-        name_function_solution = extract_function_name(solution)
-        for name in name_function_solution:
-            if name not in name_functions_problem:
-                # remove the function as it shouldn't overwrite the original function
-                solution = rm_given_function(solution, name_functions_problem)
+        try:
+            name_functions_problem = extract_function_name(problem)
+            solution = rm_given_function(solution, name_functions_problem)
+        except:
+            #solution is not ast parsable so it is incorrect
+            pass
         puzzle = just_problem + "\n" + solution
         puzzle = puzzle.split("\nassert f")
         puzzle = puzzle[0] + "\nassert f(g()) == True\n"
