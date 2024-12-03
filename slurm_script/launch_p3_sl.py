@@ -46,13 +46,15 @@ export TMPDIR=$JOBSCRATCH
 module purge
 module load arch/h100
 module load python/3.11.5
+module load cuda/12.4.1
+
 ulimit -c 0
 limit coredumpsize 0
 export CORE_PATTERN=/dev/null
 
 
 
-conda activate vllm641
+conda activate vllm612
 export CUDA_VISIBLE_DEVICES={gpu}
 export WORLD_SIZE=1
 cd /lustre/fswork/projects/rech/imi/uqv82bm/aces/
