@@ -58,7 +58,7 @@ class LLMArguments:
             "help": "api key "
         },
     )
-    gpu: Optional[bool] = field(
+    gpu: Optional[int] = field(
         default = 1,
         metadata={
             "help": "number of gpus to use (vllm)"
