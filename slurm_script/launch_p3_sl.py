@@ -58,7 +58,7 @@ if args.model_name_or_path =="model_sweep":
     list_model = [base_path_model+"mistral-large-instruct-2407-awq", base_path_model + "Qwen2.5-Coder-32B-Instruct"]
 else:
     list_model = [args.model_name_or_path]
-for model in ["mistral-large-instruct-2407-awq","Qwen2.5-Coder-32B-Instruct"]:
+for model in list_model:
     extra = ""
     if args.path_checkpoint_archive!="":
         extra += f' --path_checkpoint_archive {args.path_checkpoint_archive}'

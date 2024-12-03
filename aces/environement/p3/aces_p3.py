@@ -70,7 +70,10 @@ class ACES_p3(ACES_base):
         for p in list_p3:
             condition_add_individual = p.fitness != -np.inf
             if rm_fitness_condition:
+                # remove fitness condition when initializing the archive
                 condition_add_individual = True
+                if p.fitness == -np.inf:
+                    p.fitness = 0 #if it was unsolved give max fitness
             if condition_add_individual:
                 niche_idx = tuple(p.emb)
                 if self.aces_args.path_checkpoint_archive == "":
