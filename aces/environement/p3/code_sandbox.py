@@ -79,7 +79,7 @@ def evaluate(list_codes,list_task_id=None,entry_point="test",parallel=None,min_t
     if list_task_id is None:
         list_task_id = list(range(len(list_codes)))
     if parallel is None:
-        n_workers = max(1, 3 * multiprocessing.cpu_count() //4 )
+        n_workers = max(1, 2 * multiprocessing.cpu_count() //4 )
     else:
         n_workers = parallel
     print(n_workers)
@@ -247,7 +247,7 @@ def unsafe_execute(
         chdir = os.chdir
         # Disable functionalities that can make destructive changes to the test.
         # allow only 2GB memory usage
-        maximum_memory_bytes = int(2 * 1024 * 1024 * 1024)
+        maximum_memory_bytes = int(1 * 1024 * 1024 * 1024)
         reliability_guard(maximum_memory_bytes=maximum_memory_bytes)
         exec_globals = {}
         try:
