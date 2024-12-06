@@ -1,4 +1,4 @@
-# aces
+# ACES
 Implementation of the ACES paper: ([Generating a Diversity of Challenging Programming
 Puzzles with Autotelic Generative Models](https://openreview.net/pdf?id=L1mMK39Z7P))
 
