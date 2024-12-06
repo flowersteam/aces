@@ -52,7 +52,21 @@ class LLMClient:
             raise Exception("Server is down or unreachable")
 
     def init_offline_model(self):
-        self.llm = LLM(self.model_path, tensor_parallel_size = self.gpu, max_model_len=self.max_model_length, enable_prefix_caching=True,swap_space=self.swap_space)
+        # switch dtype to half if GPUs with compute capability is inferior to 8.0
+        import torch
+        compute_capability = torch.cuda.get_device_capability()
+        major, minor = compute_capability
+        # Compute capability as a single number (e.g., 7.5)
+        gpu_compute_capability = major + minor / 10.0
+
+        # Set dtype based on compute capability
+        if gpu_compute_capability < 8.0:
+            dtype = "float16"  # Use half-precision for older GPUs
+        else:
+            dtype = "auto"  # Use bfloat16 or keep default for newer GPUs
+            
+            
+        self.llm = LLM(self.model_path, tensor_parallel_size = self.gpu, max_model_len=self.max_model_length, enable_prefix_caching=True,swap_space=self.swap_space,dtype=dtype)
          
 
     def multiple_completion(self, batch_prompt,judge=False,guided_choice=["1","2"],n=1,temperature=None):
