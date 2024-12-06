@@ -21,7 +21,7 @@ and more challenging than problems produced by baseline methods and three
 times more challenging than problems found in existing Python programming
 benchmarks on average across 11 state-of-the-art code LLMs.
 
-![aces_fig](docs/image/aces_fig.pdf)
+![aces_fig](docs/image/aces_fig.png)
 
 
 ## Installation steps
