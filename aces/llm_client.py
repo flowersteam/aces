@@ -1,5 +1,5 @@
 import copy
-from tenacity import retry, wait_exponential,wait_random
+from tenacity import retry, wait_exponential, wait_random
 from concurrent.futures import ThreadPoolExecutor
 from vllm import LLM, SamplingParams
 
@@ -21,7 +21,7 @@ class LLMClient:
         self.cfg_generation = cfg_generation
         self.base_url = base_url
         self.api_key = api_key
-        self.timeout = 60*30 # 30 minutes timeout
+        self.timeout = 60*20 # 20 minutes timeout
         self.online = online
         self.gpu = gpu
         self.max_model_length = max_model_length
@@ -34,8 +34,18 @@ class LLMClient:
             self.init_offline_model()
 
     def init_client(self):
-        if is_server_up(self.base_url):
-            self.client = OpenAI(base_url=self.base_url, api_key=self.api_key,timeout=self.timeout)
+        server_is_up = True
+        if self.base_url != "":
+            # for self host server (e.g. vllm server), check if the server is up and running
+            server_is_up = is_server_up(self.base_url)
+        if server_is_up:
+            base_url = None 
+            if self.base_url != "":
+                base_url = self.base_url
+            api_key = None
+            if self.api_key != "":
+                api_key = self.api_key
+            self.client = OpenAI(base_url=base_url, api_key=api_key,timeout=self.timeout)
             print("Server is up and running")
         else:
             print("Server is down or unreachable")
@@ -45,17 +55,17 @@ class LLMClient:
         self.llm = LLM(self.model_path, tensor_parallel_size = self.gpu, max_model_len=self.max_model_length, enable_prefix_caching=True,swap_space=self.swap_space)
          
 
-    def multiple_completion(self, batch_prompt,judge=False,guided_choice=["1","2"],n=1):
+    def multiple_completion(self, batch_prompt,judge=False,guided_choice=["1","2"],n=1,temperature=None):
         if self.online:
             # if judge:
             #     return get_multiple_completions_judge(guided_choice, self.client, batch_prompt, cfg_generation=self.cfg_generation)
             # else:
-            return get_multiple_completions(self.client, batch_prompt, cfg_generation=self.cfg_generation,n=n)
+            return get_multiple_completions(self.client, batch_prompt, cfg_generation=self.cfg_generation,n=n,temperature=temperature)
         else:
             # if judge:
             #     return get_multiple_completions_judge_offline(guided_choice, self.llm, batch_prompt, cfg_generation=self.cfg_generation)
             # else:
-            return get_completion_offline(self.llm, batch_prompt, cfg_generation=self.cfg_generation,n=n)
+            return get_completion_offline(self.llm, batch_prompt, cfg_generation=self.cfg_generation,n=n,temperature=temperature)
     
 
 def is_server_up(base_url):
@@ -84,13 +94,16 @@ def is_server_up(base_url):
         attempt-=1
         time.sleep(20)
 
-def get_completion_offline(llm,batch_prompt,cfg_generation,n=1):
+def get_completion_offline(llm,batch_prompt,cfg_generation,n=1,temperature=None):
     tokenizer = llm.get_tokenizer()
     list_tok_allowed=[]
     flag_judge=False
+    if temperature is None:
+        temperature = cfg_generation["temperature"]
+    
     sampling_params = SamplingParams(
         n=n,
-        temperature=cfg_generation["temperature"],
+        temperature=temperature,
         max_tokens=cfg_generation["max_tokens"],
         min_p = cfg_generation["min_p"],
         )
@@ -157,6 +170,9 @@ def get_completion(client, cfg_generation: dict, messages: list, temperature=Non
     kwargs = cfg_generation.copy()
     if temperature is not None:
         kwargs["temperature"] = temperature
+    if "min_p" in kwargs:
+        del kwargs["min_p"]
+        # closed API doesn't support min_p 
     kwargs["n"] = n
 
     try:

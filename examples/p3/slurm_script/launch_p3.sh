@@ -6,8 +6,8 @@ python launch_p3_sl.py \
 --num_solutions 50 \
 --seed 0 \
 --model_name_or_path "model_sweep" \
---gpu 2 \
---swap_space 35 \
+--gpu 4 \
+--swap_space 40 \
 --long \
 --save_every_n_generations 5
 
@@ -23,7 +23,7 @@ python launch_p3_sl.py \
 --gpu 4 \
 --swap_space 40 \
 --long \
---save_every_n_generations 10
+--save_every_n_generations 4
 
 /lustre/fsn1/projects/rech/imi/uqv82bm/hf/Qwen2.5-Coder-14B-Instruct
 

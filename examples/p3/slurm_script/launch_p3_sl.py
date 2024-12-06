@@ -55,7 +55,7 @@ export CORE_PATTERN=/dev/null
 
 
 conda activate vllm612
-cd /lustre/fswork/projects/rech/imi/uqv82bm/aces/
+cd /lustre/fswork/projects/rech/imi/uqv82bm/aces/examples/p3/
 
 python launch_p3.py --path_archive {path_archive} --path_save {path_save} --name_experience {name_experience} --n_generation {n_generation} --num_solutions {num_solutions} --seed {seed} --model_name_or_path {model_name_or_path} {extra}
 """
