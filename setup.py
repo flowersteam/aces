@@ -7,5 +7,5 @@ setup(
     author="JP",
     author_email="j.pourcel31830@gmail.com",
     packages=["aces"],  
-    python_requires=">=3.11", 
+    python_requires=">=3.10", 
 )
