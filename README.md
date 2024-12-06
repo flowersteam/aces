@@ -36,15 +36,17 @@ pip install vllm
 ```
 3. install ACES
 ```
-git clone https://github.com/flowersteam/aces.git; cd aces; pip install -e .
+git clone https://github.com/flowersteam/aces.git; cd aces; pip install -e .; pip install -r requirements.txt
 
 ```
 
 ## Run Aces
+### local
 See examples scipts in or notebook to launch experiment with local or API LLMs [examples](examples/p3/).
 Example for SLURM cluster at (slurm)[examples/p3/slurm_script/]
 
-
+### Collab
+[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/drive/1TdsObaJIWLGh8bAo7tm38CURvBX_aGJb?usp=sharing)
 
 📦 ACES  
 ┣ 📂 [`aces`](babyai-text) -- *ACES code*    
