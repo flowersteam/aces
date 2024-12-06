@@ -21,7 +21,7 @@ and more challenging than problems produced by baseline methods and three
 times more challenging than problems found in existing Python programming
 benchmarks on average across 11 state-of-the-art code LLMs.
 
-![figure](docs/images/aces_fig.pdf)
+![figure](docs/images/aces_fig.png)
 
 
 ## Installation steps
@@ -30,7 +30,7 @@ benchmarks on average across 11 state-of-the-art code LLMs.
 conda create -n aces python=3.11 -y
 conda activate aces
 ```
-2. Install vLLM (see [vllm installation for latest infor](https://docs.vllm.ai/en/latest/getting_started/installation.html))
+2. Install vLLM (see [vllm installation for latest info](https://docs.vllm.ai/en/latest/getting_started/installation.html))
 ```
 pip install vllm 
 ```
@@ -47,15 +47,13 @@ Example for SLURM cluster at (slurm)[examples/p3/slurm_script/]
 
 
 📦 ACES  
-┣ 📂 [`aces`](babyai-text) -- *ACES code* 
-┃ ┣ 📂 [`environement`](aces/environement) -- *file containing code specific to each environement*  
-┃ ┃ ┣ 📜 [`load.py`](aces/environement/load.py)
-┃ ┃ ┣ 📜 [`data.json`](aces/environement/data.json) 
+┣ 📂 [`aces`](babyai-text) -- *ACES code*    
+┃ ┣ 📂 [`environement`](aces/environement) -- *file containing code specific to each environement*    
 ┣ 📂 [`examples`](examples) -- *code for our experiments*    
-┃ ┣ 📂 [`p3`](examples/agents) -- *implementation of all our agents*  
-┃ ┃ ┣ 📂 [`slurm_script`](examples/agents/slurm_script)  -- *bot agent leveraging BabyAI's bot*  
-┃ ┃ ┣ 📜 [`launch_p3_local.ipynb`](examples/agents/slurm_script/launch_p3.ipynb)  -- *Notebook to launch ACES P3 (local mode)* 
-┃ ┃ ┣ 📜 [`launch_p3_API.ipynb`](examples/agents/slurm_script/launch_p3.ipynb)  -- *Notebook to launch ACES P3 (OpenAI API mode)* 
-┃ ┃ ┣ 📜 [`launch_p3.py`](examples/agents/slurm_script/launch_p3.ipynb)  -- *Notebook to launch ACES P3*  
-┣ 📂 [`save_data`](save_data) -- *Folder where data is saved* 
-┃ ┣ 📜 [`launch_p3.ipynb`](save_data/check_data.ipynb)  -- *Notebook to explore results* 
+┃ ┣ 📂 [`p3`](examples/agents) -- *implementation of all our agents*    
+┃ ┃ ┣ 📂 [`slurm_script`](examples/agents/slurm_script)  -- *bot agent leveraging BabyAI's bot*    
+┃ ┃ ┣ 📜 [`launch_p3_local.ipynb`](examples/agents/slurm_script/launch_p3.ipynb)  -- *Notebook to launch ACES P3 (local mode)*    
+┃ ┃ ┣ 📜 [`launch_p3_API.ipynb`](examples/agents/slurm_script/launch_p3.ipynb)  -- *Notebook to launch ACES P3 (OpenAI API mode)*    
+┃ ┃ ┗ 📜 [`launch_p3.py`](examples/agents/slurm_script/launch_p3.ipynb)  -- *Notebook to launch ACES P3*    
+┣ 📂 [`save_data`](save_data) -- *Folder where data is saved*    
+┃ ┗ 📜 [`launch_p3.ipynb`](save_data/check_data.ipynb)  -- *Notebook to explore results*    
