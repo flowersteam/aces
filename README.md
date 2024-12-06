@@ -43,7 +43,7 @@ git clone https://github.com/flowersteam/aces.git; cd aces; pip install -e .; pi
 ## Run ACES
 ### local
 See examples scipts in or notebook to launch experiment with local or API LLMs [examples](examples/p3/).
-Example for SLURM cluster at (slurm)[examples/p3/slurm_script/]
+Example for SLURM cluster at [slurm](examples/p3/slurm_script/)
 
 ### Collab
 [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/drive/1TdsObaJIWLGh8bAo7tm38CURvBX_aGJb?usp=sharing)
