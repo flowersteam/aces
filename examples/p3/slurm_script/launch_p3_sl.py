@@ -15,6 +15,7 @@ parser.add_argument("--only_print", action=argparse.BooleanOptionalAction, defau
 parser.add_argument("--swap_space", type=int, default=5)
 parser.add_argument("--long", action=argparse.BooleanOptionalAction, default=False)
 parser.add_argument("--save_every_n_generations", type=int, default=5)
+parser.add_argument("--dev", action=argparse.BooleanOptionalAction, help="Development mode")
 
 
 
@@ -23,7 +24,10 @@ args = parser.parse_args()
 
 if args.long:
     qos = "#SBATCH --qos=qos_gpu_h100-t4"
-    h = 64
+    h = 99
+elif args.dev:
+    qos = "#SBATCH --qos=qos_gpu_h100-dev"
+    h = 2
 else:
     qos= ""
     h=20
