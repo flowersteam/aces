@@ -73,9 +73,9 @@ class ACES_p3(ACES_base):
 
             self.idx_generation = list_codes[-1].idx_generation
             self.unique_id = list_codes[-1].unique_id + 1
-            self.update_archive(list_codes)
+            self.update_archive(list_codes, update_id= False)
             
-    def update_archive(self,list_p3: list[P3], rm_fitness_condition = False):
+    def update_archive(self,list_p3: list[P3], rm_fitness_condition = False,update_id = True):
         """update archive with valid puzzles"""
         for p in list_p3:
             condition_add_individual = p.fitness != -np.inf
@@ -86,14 +86,15 @@ class ACES_p3(ACES_base):
                     p.fitness = 0 #if it was unsolved give max fitness
             if condition_add_individual:
                 niche_idx = tuple(p.emb)
-                if self.aces_args.path_checkpoint_archive == "":
+                if update_id:
                     p.unique_id = self.unique_id
+                    self.unique_id +=1
                 self.archive.append(p)
                 self.fitnesses.append(p.fitness)
                 if not niche_idx in self.niche_to_idx_archive:
                     self.niche_to_idx_archive[niche_idx] = []
                 self.niche_to_idx_archive[niche_idx].append(p.unique_id)
-                self.unique_id +=1
+                
     
     def generate_multiple_solutions(self, puzzles: list[P3]) -> List[P3]:
         """Use LLM to generate multiple solutions for a list of puzzle"""
@@ -131,10 +132,14 @@ class ACES_p3(ACES_base):
         list_task_id = []
         list_task_id_unique = []
         list_codes_to_test = []
-        str_to_add=str(
-                    f"\ndef run_eval():\n"
-                    f"    return f(g()) == True"
-                )
+        str_to_add = (
+            f"\nimport random\n"
+            f"import numpy as np\n"
+            f"random.seed(42)\n"
+            f"np.random.seed(42)\n"
+            f"def run_eval():\n"
+            f"    return f(g()) == True"
+        )
         for id_puz,p in enumerate(puzzles):
             list_task_id_unique.append(id_puz)
             for id_sol in range(len(p.all_solution)):
@@ -230,6 +235,67 @@ class ACES_p3(ACES_base):
                     list_new_p3.append(new_p3)
         return list_new_p3
 
+    def filter_problems(self, puzzles: list[P3]) -> List[P3]:
+        """Filter problems based on if they are solved with trivial solution [], 0, None, '' """
+        print("filtering problems")
+        list_task_id = []
+        list_task_id_unique = []
+        list_codes_to_test = []
+        str_to_add = (
+            f"\nimport random\n"
+            f"import numpy as np\n"
+            f"random.seed(42)\n"
+            f"np.random.seed(42)\n"
+            f"def run_eval():\n"
+            f"    cond = False\n"
+            f"    list_test_sol = [[],None,'',[[]]]\n"
+            f"    for test_sol in list_test_sol:\n"
+            f"        try:\n"
+            f"            cond = f(test_sol) == True\n"
+            f"        except:\n"
+            f"            cond = False\n"
+            f"        if cond:\n"
+            f"            return True\n"
+            f"    return False\n"
+        )
+        for id_puz,p in enumerate(puzzles):
+            list_task_id_unique.append(id_puz)
+            # for id_sol in range(len(p.all_solution)):
+            #     list_task_id.append(id_puz)
+            #     list_codes_to_test.append(p.all_solution[id_sol] + str_to_add)
+
+            list_task_id.append(id_puz)
+            list_codes_to_test.append(p.program_str.split("\nassert f(")[0] + str_to_add)
+        results = evaluate(list_codes_to_test, list_task_id, entry_point="run_eval",min_time_limit= 5*5, gt_time_limit_factor= 2*5)
+        # dic_passk = results["pass@k"] # {task_id: pass@k} 
+        raw_result = results["raw_result"] 
+        list_rm_task_id = []
+        for task_id in list_task_id_unique:
+            all_solution = []
+            all_solution_correct = []
+            for id_completion in range(len(raw_result[task_id])):
+                all_solution.append(raw_result[task_id][id_completion]["code"].split(str_to_add)[0])
+                all_solution_correct.append(raw_result[task_id][id_completion]["correct"])
+            
+            # puzzles[task_id].all_solution = all_solution
+            # puzzles[task_id].all_solution_correct = all_solution_correct
+
+            number_solution = len(all_solution)
+            c = sum(all_solution_correct)
+            k=1 # estimation of pass@1
+            
+            # if c==0 keep the puzzle
+            # else remove it
+            if c!=0: 
+                list_rm_task_id.append(task_id)
+        print(f"removing {len(list_rm_task_id)} / {len(puzzles)} puzzle with trivial solution")
+        if len(list_rm_task_id) > 0:
+            print("removing puzzle with trivial solution:\n", puzzles[list_rm_task_id[0]].program_str)
+        for id_sol_rm in list_rm_task_id[::-1]:
+            # remove puzzle from the list
+            del puzzles[id_sol_rm]
+        return puzzles
+    
 if __name__ == '__main__':
     from dataclasses import dataclass, field
     from typing import Optional
@@ -360,7 +426,18 @@ if __name__ == '__main__':
                 "help": "swap space (RAM memory for cache)"
             }
         )
-
+        azure: Optional[bool] = field(
+            default=False,
+            metadata={
+                "help": "use azure if True"
+            },
+        )
+        local_server: Optional[bool] = field(
+            default=False,
+            metadata={
+                "help": "use local_server "
+            },
+        )
 
     # parser = HfArgumentParser((AcesArguments,QdArguments,LLMArguments))
     # model_args, data_args, training_args = parser.parse_args_into_dataclasses()#["--output_dir", "/home/flowers/work/hf/trained/"])

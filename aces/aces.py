@@ -8,6 +8,7 @@ import os
 from itertools import combinations
 from scipy.spatial.distance import cdist
 import pickle
+from tqdm import trange
 
 
 class ACES_base:
@@ -60,7 +61,10 @@ class ACES_base:
                              online = self.llm_args.online, 
                              gpu = self.llm_args.gpu,
                              max_model_length = self.llm_args.max_model_length,
-                             swap_space = self.llm_args.swap_space )
+                             swap_space = self.llm_args.swap_space,
+                             azure = self.llm_args.azure,
+                             local_server = self.llm_args.local_server
+                            )
         print("LLM client initialized")
     
     def initialize_environment(self) -> None:
@@ -151,6 +155,11 @@ class ACES_base:
     def generate_new_problems(self,list_goal_with_examples):
         """Generate new puzzles"""
         raise NotImplementedError
+    
+    def filter_problems(self, list_codes: list[Genotype]) -> list[Genotype]:
+        """Filter problems"""
+        return list_codes
+    
     def sample_goals(self,):
         """
         Sample goals in the semantic space (combination of skills)
@@ -317,13 +326,15 @@ class ACES_base:
         return [p for p in list_p3 if p.fitness != -np.inf]
     
     def run(self):
-        for id_iterations in range(self.aces_args.n_generation):
+        for id_iterations in trange(self.aces_args.n_generation):
             self.idx_generation += 1
             # Generate novel targets in semantic space
             # with some few shot examples that are close in the semantic space 
             list_goal_with_examples = self.sample_goal_with_examples()
             print("generating new goal")
             list_codes = self.generate_new_problems(list_goal_with_examples)
+            # filter_problems
+            list_codes = self.filter_problems(list_codes)
             print(f"generation {self.idx_generation}:\n- {len(list_codes)} goal generated")
             if len(list_codes) == 0:
                 print("no puzzle generated")

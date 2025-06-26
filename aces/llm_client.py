@@ -3,7 +3,7 @@ from tenacity import retry, wait_exponential, wait_random
 from concurrent.futures import ThreadPoolExecutor
 from vllm import LLM, SamplingParams
 
-from openai import OpenAI
+from openai import OpenAI, AzureOpenAI
 import requests
 from requests.exceptions import RequestException
 import time
@@ -16,7 +16,7 @@ class Response:
 
 
 class LLMClient:
-    def __init__(self, model: str, cfg_generation: dict, base_url: str, api_key: str, online: bool = False, gpu=1, max_model_length=20000,swap_space=5):
+    def __init__(self, model: str, cfg_generation: dict, base_url: str, api_key: str, online: bool = False, gpu=1, max_model_length=20000,swap_space=5, azure=False, local_server=False):
         self.model_path = model
         self.cfg_generation = cfg_generation
         self.base_url = base_url
@@ -26,6 +26,9 @@ class LLMClient:
         self.gpu = gpu
         self.max_model_length = max_model_length
         self.swap_space = swap_space
+        self.azure = azure
+        self.local_server = local_server
+        self.qwen3 = "qwen3" in model.lower() 
         
 
         if online:
@@ -35,17 +38,20 @@ class LLMClient:
 
     def init_client(self):
         server_is_up = True
-        if self.base_url != "":
+        if self.base_url != "" and self.local_server:
             # for self host server (e.g. vllm server), check if the server is up and running
             server_is_up = is_server_up(self.base_url)
-        if server_is_up:
-            base_url = None 
+        if server_is_up: 
             if self.base_url != "":
                 base_url = self.base_url
             api_key = None
             if self.api_key != "":
                 api_key = self.api_key
-            self.client = OpenAI(base_url=base_url, api_key=api_key,timeout=self.timeout)
+            if self.azure: 
+                self.client = AzureOpenAI(base_url=base_url, api_key=api_key,timeout=self.timeout,api_version="2024-12-01-preview",)
+            else:
+                self.client = OpenAI(base_url=base_url, api_key=api_key,timeout=self.timeout)
+
             print("Server is up and running")
         else:
             print("Server is down or unreachable")
@@ -74,12 +80,14 @@ class LLMClient:
             # if judge:
             #     return get_multiple_completions_judge(guided_choice, self.client, batch_prompt, cfg_generation=self.cfg_generation)
             # else:
+            if self.qwen3:
+                self.cfg_generation["chat_template_kwargs"] =  {"enable_thinking": False}
             return get_multiple_completions(self.client, batch_prompt, cfg_generation=self.cfg_generation,n=n,temperature=temperature)
         else:
             # if judge:
             #     return get_multiple_completions_judge_offline(guided_choice, self.llm, batch_prompt, cfg_generation=self.cfg_generation)
             # else:
-            return get_completion_offline(self.llm, batch_prompt, cfg_generation=self.cfg_generation,n=n,temperature=temperature)
+            return get_completion_offline(self.llm, batch_prompt, cfg_generation=self.cfg_generation,n=n,temperature=temperature,qwen3=self.qwen3)
     
 
 def is_server_up(base_url):
@@ -108,7 +116,7 @@ def is_server_up(base_url):
         attempt-=1
         time.sleep(20)
 
-def get_completion_offline(llm,batch_prompt,cfg_generation,n=1,temperature=None):
+def get_completion_offline(llm,batch_prompt,cfg_generation,n=1,temperature=None,qwen3=False):
     tokenizer = llm.get_tokenizer()
     list_tok_allowed=[]
     flag_judge=False
@@ -135,8 +143,10 @@ def get_completion_offline(llm,batch_prompt,cfg_generation,n=1,temperature=None)
                     allowed_token_ids=alowed_tokens
                     )
                 flag_judge=True
-    
-    batch_prompt_formated = tokenizer.apply_chat_template(batch_prompt,tokenize=False,add_generation_prompt=True)
+    if qwen3:
+        batch_prompt_formated = tokenizer.apply_chat_template(batch_prompt,tokenize=False,add_generation_prompt=True,enable_thinking=False)
+    else:
+        batch_prompt_formated = tokenizer.apply_chat_template(batch_prompt,tokenize=False,add_generation_prompt=True)
     outs = llm.generate(batch_prompt_formated,sampling_params)
     list_out_process=[]
     logprobs=None
@@ -173,7 +183,7 @@ def get_multiple_completions_judge_offline(guided_choice,llm,batch_prompt: list[
         cfg_generation["extra_body"]["guided_choice"] = guided_choice
         cfg_generation["logprobs"]=5
         cfg_generation["top_logprobs"]=10
-
+        
         return get_completion_offline(batch_prompt =batch_prompt,llm=llm, cfg_generation=cfg_generation)
 
 

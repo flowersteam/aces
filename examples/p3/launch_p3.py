@@ -130,6 +130,19 @@ class LLMArguments:
             "help": "swap space (RAM memory for cache)"
         }
     )
+    azure: Optional[bool] = field(
+        default=False,
+        metadata={
+            "help": "use azure if True"
+        },
+    )
+    openai_api: Optional[bool] = field(
+        default=False,
+        metadata={
+            "help": "use openai_api if True"
+        },
+    )
+
 parser = HfArgumentParser((AcesArguments,LLMArguments))
 aces_args, llm_args = parser.parse_args_into_dataclasses()
 # aces_args, llm_args = AcesArguments(), LLMArguments()

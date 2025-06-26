@@ -5,8 +5,8 @@ parser = argparse.ArgumentParser()
 parser.add_argument("--path_archive", type=str, default="/lustre/fswork/projects/rech/imi/uqv82bm/aces/aces/environement/p3/preprocess_p3_emb_dedup_puzzles.json")
 parser.add_argument("--path_save", type=str, default="/lustre/fswork/projects/rech/imi/uqv82bm/aces/save_data/")
 parser.add_argument("--name_experience", type=str, default="test")
-parser.add_argument("--n_generation", type=int, default=200)
-parser.add_argument("--num_solutions", type=int, default=100)
+parser.add_argument("--n_generation", type=int, default=100)
+parser.add_argument("--num_solutions", type=int, default=50)
 parser.add_argument("--seed", type=int, default=0)
 parser.add_argument("--model_name_or_path", type=str, default="model_sweep")
 parser.add_argument("--path_checkpoint_archive", type=str, default="")
@@ -46,15 +46,13 @@ export TMPDIR=$JOBSCRATCH
 module purge
 module load arch/h100
 module load python/3.11.5
-module load cuda/12.4.1
-
 ulimit -c 0
 limit coredumpsize 0
 export CORE_PATTERN=/dev/null
 
 
 
-conda activate vllm612
+conda activate aces
 cd /lustre/fswork/projects/rech/imi/uqv82bm/aces/examples/p3/
 
 python launch_p3.py --path_archive {path_archive} --path_save {path_save} --name_experience {name_experience} --n_generation {n_generation} --num_solutions {num_solutions} --seed {seed} --model_name_or_path {model_name_or_path} {extra}
