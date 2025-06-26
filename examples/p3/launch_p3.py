@@ -136,7 +136,7 @@ class LLMArguments:
             "help": "use azure if True"
         },
     )
-    openai_api: Optional[bool] = field(
+    local_server: Optional[bool] = field(
         default=False,
         metadata={
             "help": "use openai_api if True"
