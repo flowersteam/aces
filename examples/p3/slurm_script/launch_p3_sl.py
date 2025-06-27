@@ -62,7 +62,7 @@ limit coredumpsize 0
 export CORE_PATTERN=/dev/null
 
 
-
+{module_load}
 conda activate {env_name}
 cd /lustre/fswork/projects/rech/imi/uqv82bm/aces/examples/p3/
 
@@ -71,7 +71,9 @@ python launch_p3.py --path_archive {path_archive} --path_save {path_save} --name
 """
 # export CUDA_VISIBLE_DEVICES={gpu}
 # export WORLD_SIZE=1
-
+module_load = ""
+if args.sglang:
+    module_load = "module load cuda/12.8.0"
 export_stuff=""
 if args.log_level:
     export_stuff += f"export VLLM_LOGGING_LEVEL=ERROR"
@@ -108,7 +110,7 @@ for model in list_model:
     slurmfile_path = f'run_{job_name}.slurm'
     env_name = "aces_sglang" if args.sglang else "aces"
     name_experience= model_id+"_"+args.name_experience +"_nsolution-"+str(args.num_solutions)+ "_seed_"+str(args.seed)
-    script = script_template.format(qos=qos,h=h,gpu=args.gpu,cpu=cpu,path_archive=args.path_archive, path_save=args.path_save, name_experience=name_experience, n_generation=args.n_generation, num_solutions=args.num_solutions, seed=args.seed, model_name_or_path=model, extra=extra, job_name=job_name,env_name=env_name,export_stuff=export_stuff)
+    script = script_template.format(qos=qos,h=h,gpu=args.gpu,cpu=cpu,path_archive=args.path_archive, path_save=args.path_save, name_experience=name_experience, n_generation=args.n_generation, num_solutions=args.num_solutions, seed=args.seed, model_name_or_path=model, extra=extra, job_name=job_name,env_name=env_name,export_stuff=export_stuff,module_load=module_load)
     if args.only_print:
         print(script)
         exit()
