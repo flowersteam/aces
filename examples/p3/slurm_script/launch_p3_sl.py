@@ -21,6 +21,7 @@ parser.add_argument("--dev", action=argparse.BooleanOptionalAction, help="Develo
 parser.add_argument("--log_level", type=str, default="info", help="Log level for sglang/vllm server")
 
 # sampling parameters
+parser.add_argument("--temperature_labeller", type=float, default=0.0, help="Temperature for sampling labeller")
 parser.add_argument("--temperature", type=float, default=1.0, help="Temperature for sampling")
 parser.add_argument("--min_p", type=float, default=0.0, help="Min_p for sampling")
 parser.add_argument("--top_p", type=float, default=1.0, help="Top-p sampling parameter")
@@ -102,7 +103,8 @@ for model in list_model:
     extra += f" --top_p {args.top_p}"
     extra += f" --top_k {args.top_k}"
     extra += f" --log_level {args.log_level}"
-    extra+= f" --save_every_n_generations {args.save_every_n_generations}"    
+    extra += f" --save_every_n_generations {args.save_every_n_generations}"    
+    extra += f" --temperature_labeller {args.temperature_labeller}"
     if args.fp8:
         extra += " --fp8"
     else:
