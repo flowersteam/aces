@@ -335,9 +335,8 @@ def get_completion(client, cfg_generation: dict, messages: list, temperature=Non
     for completion_out in completion.choices:
         list_response.append(completion_out.message.content)
     # response = completion.choices[-1].message.content
-    if "extra_body" in kwargs:
-            if "guided_choice" in kwargs["extra_body"]:
-                logprobs = extract_top_logprobs(completion.choices[-1],guided_choice=kwargs["extra_body"]["guided_choice"])
+    if "extra_body" in "guided_choice" in kwargs["extra_body"]:
+        logprobs = extract_top_logprobs(completion.choices[-1],guided_choice=kwargs["extra_body"]["guided_choice"])
     else:
         logprobs = None
     

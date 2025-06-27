@@ -45,22 +45,27 @@ class ACES_p3(ACES_base):
             list_code_formated = []
 
             # generate semantic descriptor
+            print("generate semantic descriptors (initial archive)")
             for p in list_codes:
                 list_code_formated.append(P3(program_str = p['program_str'], idx_generation = self.idx_generation))
             list_codes = self.generate_semantic_descriptors(list_code_formated)
             
             # generate dfficulty
             ## generate multiple solutions
+            print("generating multiple solutions (initial archive)")
             list_codes = self.generate_multiple_solutions(list_codes)
             ## evaluate python code
+            print("evaluate solutions (initial archive)")
             list_codes = self.evaluate_python_code(list_codes)
             #check how many problem are solved
             codes_valid = sum([np.isfinite(codes.fitness) for codes in list_codes])
             print("valid codes in initial archive: ", codes_valid, " / ", len(list_codes))
 
             ## generate description
+            print("generate description (initial archive)")
             list_codes = self.generate_description(list_codes)
             # rm_fitness_condition = True because initial puzzles should be solvable
+            print("update archive with initial puzzles")
             self.update_archive(list_codes, rm_fitness_condition = True)
         else:
             print("resume experiment from the given a archive checkpoint: ", self.aces_args.path_checkpoint_archive)

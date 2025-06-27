@@ -97,16 +97,20 @@ class ACES_base:
             list_code_formated = []
 
             # generate semantic descriptor
+            print("generate semantic descriptors (initial archive)")
             for p in list_codes:
                 list_code_formated.append(Genotype(program_str = p['program_str'], idx_generation = self.idx_generation))
             list_codes = self.generate_semantic_descriptors(list_code_formated)
             
             # generate dfficulty
             ## generate multiple solutions
+            print("generating multiple solutions (initial archive)")
             list_codes = self.generate_multiple_solutions(list_codes)
             ## evaluate python code
+            print("evaluate solutions (initial archive)")
             list_codes = self.evaluate_python_code(list_codes)
             ## generate description
+            print("generate description (initial archive)")
             list_codes = self.generate_description(list_codes)
             # rm_fitness_condition = True because initial puzzles should be solvable
             self.update_archive(list_codes, rm_fitness_condition = True)
