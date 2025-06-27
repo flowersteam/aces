@@ -25,6 +25,7 @@ parser.add_argument("--temperature", type=float, default=1.0, help="Temperature 
 parser.add_argument("--min_p", type=float, default=0.0, help="Min_p for sampling")
 parser.add_argument("--top_p", type=float, default=1.0, help="Top-p sampling parameter")
 parser.add_argument("--top_k", type=int, default=-1, help="Top-k sampling parameter, -1 for no top-k")
+parser.add_argument("--fp8", action=argparse.BooleanOptionalAction, help="fp8")
 
 
 args = parser.parse_args()
@@ -102,6 +103,10 @@ for model in list_model:
     extra += f" --top_k {args.top_k}"
     extra += f" --log_level {args.log_level}"
     extra+= f" --save_every_n_generations {args.save_every_n_generations}"    
+    if args.fp8:
+        extra += " --fp8"
+    else:
+        extra += " --no-fp8"
     model_id = model
     if "/" in model_id:
         model_id = model_id.split("/")[-1]
