@@ -15,6 +15,7 @@ class ACES_base:
     def __init__(self, AcesArguments: dataclass, LLMArguments : dataclass):
         # initialize LLM client
         self.llm_args = LLMArguments
+        self.llm_args.seed = AcesArguments.seed
         self.unique_id = 0
         self.idx_generation = 0
         self.archive = []
@@ -52,8 +53,19 @@ class ACES_base:
     def init_llm(self,) -> None:
         """init LLM client"""
         print("init LLM client")
-        cfg_generation ={"model": self.llm_args.model_name_or_path, "temperature": self.llm_args.temperature,"max_tokens": self.llm_args.max_tokens}
-        cfg_generation["min_p"] = self.llm_args.min_p
+        cfg_generation = {"model": self.llm_args.model_name_or_path, "temperature": self.llm_args.temperature,"max_tokens": self.llm_args.max_tokens}
+        if self.llm_args.min_p!=0:
+            if "extra_body" not in cfg_generation:
+                cfg_generation["extra_body"] = {}
+
+            cfg_generation["extra_body"]["min_p"] = self.llm_args.min_p
+            cfg_generation["min_p"] = self.llm_args.min_p
+        if self.llm_args.top_k!=-1:
+            if "extra_body" not in cfg_generation:
+                cfg_generation["extra_body"] = {}
+            cfg_generation["extra_body"]["top_k"] = self.llm_args.top_k
+        if self.llm_args.top_p!=1:
+            cfg_generation["top_p"] = self.llm_args.top_p
         self.llm = LLMClient(model = self.llm_args.model_name_or_path, 
                              cfg_generation = cfg_generation,
                              base_url = self.llm_args.base_url, 
@@ -61,9 +73,13 @@ class ACES_base:
                              online = self.llm_args.online, 
                              gpu = self.llm_args.gpu,
                              max_model_length = self.llm_args.max_model_length,
-                             swap_space = self.llm_args.swap_space,
                              azure = self.llm_args.azure,
-                             local_server = self.llm_args.local_server
+                             local_server = self.llm_args.local_server,
+                             seed = self.llm_args.seed,
+                             fp8 = self.llm_args.fp8,
+                             gpu_memory = self.llm_args.gpu_memory,
+                             sglang=self.llm_args.sglang,
+                             log_level= self.llm_args.log_level
                             )
         print("LLM client initialized")
     
@@ -106,7 +122,11 @@ class ACES_base:
             self.idx_generation = list_codes[-1].idx_generation
             self.unique_id = list_codes[-1].unique_id + 1
             self.update_archive(list_codes)
-            
+    
+    def terminate(self):
+        """Terminate the environment and the LLM client"""
+        self.llm.terminate()
+
     def update_archive(self, inital_codes: list[Genotype], rm_fitness_condition = False):
         """update archive with valid puzzles"""
         for code in inital_codes:
@@ -326,38 +346,43 @@ class ACES_base:
         return [p for p in list_p3 if p.fitness != -np.inf]
     
     def run(self):
-        for id_iterations in trange(self.aces_args.n_generation):
-            self.idx_generation += 1
-            # Generate novel targets in semantic space
-            # with some few shot examples that are close in the semantic space 
-            list_goal_with_examples = self.sample_goal_with_examples()
-            print("generating new goal")
-            list_codes = self.generate_new_problems(list_goal_with_examples)
-            # filter_problems
-            list_codes = self.filter_problems(list_codes)
-            print(f"generation {self.idx_generation}:\n- {len(list_codes)} goal generated")
-            if len(list_codes) == 0:
-                print("no puzzle generated")
-                continue
+        try:
 
-            # generate dfficulty
-            ## generate multiple solutions
-            print("generating multiple solutions")
-            list_codes = self.generate_multiple_solutions(list_codes)
-            ## evaluate python code
-            print("evaluate solutions")
-            list_codes = self.evaluate_python_code(list_codes)
+            for id_iterations in trange(self.idx_generation,self.aces_args.n_generation):
+                self.idx_generation += 1
+                # Generate novel targets in semantic space
+                # with some few shot examples that are close in the semantic space 
+                list_goal_with_examples = self.sample_goal_with_examples()
+                print("generating new goal")
+                list_codes = self.generate_new_problems(list_goal_with_examples)
+                # filter_problems
+                list_codes = self.filter_problems(list_codes)
+                print(f"generation {self.idx_generation}:\n- {len(list_codes)} goal generated")
+                if len(list_codes) == 0:
+                    print("no puzzle generated")
+                    continue
 
-            list_codes = self.rm_incorrect_puzzles(list_codes)
-            print(f"- {len(list_codes)} puzzles are correct")
-            if len(list_codes) == 0:
-                print("no correct puzzle generated")
-                continue
-            # generate semantic descriptor
-            list_codes = self.generate_semantic_descriptors(list_codes)
-            # generate description
-            list_codes = self.generate_description(list_codes)
-            self.update_archive(list_codes)
-            if (id_iterations) % self.aces_args.save_every_n_generations == 0:
-                print("saving archive")
-                self.save_archive()
+                # generate dfficulty
+                ## generate multiple solutions
+                print("generating multiple solutions")
+                list_codes = self.generate_multiple_solutions(list_codes)
+                ## evaluate python code
+                print("evaluate solutions")
+                list_codes = self.evaluate_python_code(list_codes)
+
+                list_codes = self.rm_incorrect_puzzles(list_codes)
+                print(f"- {len(list_codes)} puzzles are correct")
+                if len(list_codes) == 0:
+                    print("no correct puzzle generated")
+                    continue
+                # generate semantic descriptor
+                list_codes = self.generate_semantic_descriptors(list_codes)
+                # generate description
+                list_codes = self.generate_description(list_codes)
+                self.update_archive(list_codes)
+                if (id_iterations) % self.aces_args.save_every_n_generations == 0:
+                    print("saving archive")
+                    self.save_archive()
+        except Exception as e:
+            print(f"Error during run: {e}")
+        self.terminate()

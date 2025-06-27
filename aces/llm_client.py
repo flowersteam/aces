@@ -1,8 +1,9 @@
 import copy
 from tenacity import retry, wait_exponential, wait_random
 from concurrent.futures import ThreadPoolExecutor
-from vllm import LLM, SamplingParams
 
+import subprocess
+import numpy as np
 from openai import OpenAI, AzureOpenAI
 import requests
 from requests.exceptions import RequestException
@@ -14,9 +15,74 @@ class Response:
         self.response = response
         self.logprobs = logprobs
 
+def launch_vllm_serv(model_path: str, gpu: int = 1, max_model_length=20000, port: int = 8000, fp8: bool = False, gpu_memory=0.9, seed: int = 0, log_level="info"):
+    command = f"vllm serve {model_path} --tensor-parallel-size {gpu} --max-model-len {max_model_length}  --port {port} --gpu-memory-utilization {gpu_memory} --seed {seed} --trust-remote-code --uvicorn-log-level {log_level} "
+    if fp8:
+        command += "--quantization fp8 "
+    server_process = execute_shell_command(
+        command
+    )
+    print(command)
+    # stuff to add later
+    # --uvicorn-log-level {debug,info,warning,error,critical,trace}
+    # --reasoning-parser
+    # --enable-reasoning
+    return server_process
+
+def launch_sglang_serv(model_path: str, gpu: int = 1, max_model_length=20000, port: int = 8000, fp8: bool = False, gpu_memory=0.9, seed: int = 0, log_level="info"):
+    command = f"python -m sglang.launch_server --model-path {model_path} --tp {gpu} --context-length {max_model_length}  --port {port} --mem-fraction-static {gpu_memory} --random-seed {seed} --host 0.0.0.0 --log-level {log_level} "
+    if fp8:
+        command += "--quantization fp8 "
+    server_process = execute_shell_command(
+        command
+    )
+    print(command)
+    # stuff to add later
+    # --uvicorn-log-level {debug,info,warning,error,critical,trace}
+    # --reasoning-parser
+    # --enable-reasoning
+    return server_process
+
+def check_server_run(model_path, port, server_process,vllm=False):
+    """Check if the server is running and serving the correct model.
+    Needed when launching multiple inference processes on a cluster.
+    """
+    try:
+        wait_for_server(f"http://localhost:{port}")
+        time.sleep(15)
+        if vllm:
+            req= f"http://localhost:{port}/v1/models"
+        else:
+            req= f"http://localhost:{port}/get_model_info"
+        response = requests.get(
+            req,
+            headers={"Authorization": "Bearer None"},
+        )
+        if vllm:
+            model_id_serv = response.json()["data"][0]["id"]
+        else:
+            model_id_serv = response.json()["model_path"]
+            good_model = response.json()["model_path"] == model_path
+        print("model_id_serv", model_id_serv)
+        print("model_path", model_path)
+        good_model = model_id_serv == model_path
+        print("good_model", good_model)
+        if not good_model:
+            raise Exception("wrong model")
+    except:
+        return False
+    is_running = server_process.poll() is None
+    print("is_running", is_running)
+    if not is_running:
+        return False
+    return True
 
 class LLMClient:
-    def __init__(self, model: str, cfg_generation: dict, base_url: str, api_key: str, online: bool = False, gpu=1, max_model_length=20000,swap_space=5, azure=False, local_server=False):
+    def __init__(self, model: str, cfg_generation: dict, base_url: str,
+                  api_key: str, online: bool = False, gpu=1,
+                    max_model_length=20000, azure=False,
+                    local_server=False, seed=0, fp8=False, gpu_memory=0.9,
+                    sglang= False, log_level="info"):
         self.model_path = model
         self.cfg_generation = cfg_generation
         self.base_url = base_url
@@ -25,11 +91,15 @@ class LLMClient:
         self.online = online
         self.gpu = gpu
         self.max_model_length = max_model_length
-        self.swap_space = swap_space
         self.azure = azure
         self.local_server = local_server
+        # should add vllm or sglang option
         self.qwen3 = "qwen3" in model.lower() 
-        
+        self.seed = seed
+        self.fp8 = fp8
+        self.gpu_memory = gpu_memory
+        self.sglang = sglang
+        self.log_level = log_level # default log level for sglang
 
         if online:
             self.init_client()
@@ -38,19 +108,55 @@ class LLMClient:
 
     def init_client(self):
         server_is_up = True
-        if self.base_url != "" and self.local_server:
+        if self.local_server:
+            # stuff for slurm protection in case of multiple jobs
+            port = np.random.randint(30000,30100)
+            # TODO: vllm/ SGLang
+            if self.sglang:
+                server_process = launch_sglang_serv(model_path=self.model_path, gpu= self.gpu,
+                                                max_model_length=self.max_model_length, port= port,
+                                                fp8 = self.fp8, gpu_memory=self.gpu_memory, seed = self.seed, log_level = self.log_level)
+            else:
+                server_process = launch_vllm_serv(model_path=self.model_path, gpu= self.gpu,
+                                                max_model_length=self.max_model_length, port= port,
+                                                fp8 = self.fp8, gpu_memory=self.gpu_memory, seed = self.seed, log_level = self.log_level)
+            print("check server run 0")
+            is_running = check_server_run(self.model_path,port,server_process,vllm=not self.sglang)
+            if not is_running:
+                for i_try in range(1,3):
+                    port += 1
+                    if self.sglang:
+                        server_process = launch_sglang_serv(model_path=self.model_path, gpu= self.gpu,
+                                                        max_model_length=self.max_model_length, port= port,
+                                                        fp8 = self.fp8, gpu_memory=self.gpu_memory, seed = self.seed)
+                    else:
+                        # launch vllm server
+                        server_process = launch_vllm_serv(model_path=self.model_path, gpu= self.gpu,
+                                        max_model_length=self.max_model_length, port= port,
+                                        fp8 = self.fp8, gpu_memory=self.gpu_memory, seed = self.seed)
+                    print("check server run ", i_try)
+                    is_good = check_server_run(self.model_path,port,server_process,vllm=not self.sglang)
+                    if is_good:
+                        break
+            self.base_url=f"http://localhost:{port}/v1" 
+            self.api_key="None"
+            is_good = check_server_run(self.model_path,port,server_process,vllm=not self.sglang)
+            self.server_process = server_process
+            if not is_good:
+                raise Exception("wrong model")
+
+        elif self.base_url != "" and self.local_server:
             # for self host server (e.g. vllm server), check if the server is up and running
             server_is_up = is_server_up(self.base_url)
+        
         if server_is_up: 
-            if self.base_url != "":
-                base_url = self.base_url
             api_key = None
             if self.api_key != "":
                 api_key = self.api_key
             if self.azure: 
-                self.client = AzureOpenAI(base_url=base_url, api_key=api_key,timeout=self.timeout,api_version="2024-12-01-preview",)
+                self.client = AzureOpenAI(base_url=self.base_url, api_key=api_key,timeout=self.timeout,api_version="2024-12-01-preview",)
             else:
-                self.client = OpenAI(base_url=base_url, api_key=api_key,timeout=self.timeout)
+                self.client = OpenAI(base_url=self.base_url, api_key=api_key,timeout=self.timeout)
 
             print("Server is up and running")
         else:
@@ -58,6 +164,7 @@ class LLMClient:
             raise Exception("Server is down or unreachable")
 
     def init_offline_model(self):
+        from vllm import LLM
         # switch dtype to half if GPUs with compute capability is inferior to 8.0
         import torch
         compute_capability = torch.cuda.get_device_capability()
@@ -73,7 +180,12 @@ class LLMClient:
             
             
         self.llm = LLM(self.model_path, tensor_parallel_size = self.gpu, max_model_len=self.max_model_length, enable_prefix_caching=True,swap_space=self.swap_space,dtype=dtype)
-         
+
+    def terminate(self):
+        try:
+            terminate_process(self.server_process) 
+        except Exception as e:
+            print(f"Error terminating server process: {e}")
 
     def multiple_completion(self, batch_prompt,judge=False,guided_choice=["1","2"],n=1,temperature=None):
         if self.online:
@@ -81,7 +193,10 @@ class LLMClient:
             #     return get_multiple_completions_judge(guided_choice, self.client, batch_prompt, cfg_generation=self.cfg_generation)
             # else:
             if self.qwen3:
-                self.cfg_generation["chat_template_kwargs"] =  {"enable_thinking": False}
+                if not "extra_body" in self.cfg_generation:
+                    self.cfg_generation["extra_body"] = {}
+                
+                self.cfg_generation["extra_body"].update({"chat_template_kwargs":{"enable_thinking": False}})
             return get_multiple_completions(self.client, batch_prompt, cfg_generation=self.cfg_generation,n=n,temperature=temperature)
         else:
             # if judge:
@@ -117,6 +232,8 @@ def is_server_up(base_url):
         time.sleep(20)
 
 def get_completion_offline(llm,batch_prompt,cfg_generation,n=1,temperature=None,qwen3=False):
+    from vllm import  SamplingParams
+
     tokenizer = llm.get_tokenizer()
     list_tok_allowed=[]
     flag_judge=False
@@ -194,8 +311,8 @@ def get_completion(client, cfg_generation: dict, messages: list, temperature=Non
     kwargs = cfg_generation.copy()
     if temperature is not None:
         kwargs["temperature"] = temperature
-    if "min_p" in kwargs:
-        del kwargs["min_p"]
+    # if "min_p" in kwargs:
+    #     del kwargs["min_p"]
         # closed API doesn't support min_p 
     kwargs["n"] = n
 
@@ -206,6 +323,11 @@ def get_completion(client, cfg_generation: dict, messages: list, temperature=Non
         )
     except Exception as e:
         print("completion problem: ", e)
+        too_long = "longer than the model's context length" in e.body["message"]
+        if too_long:
+            return [e.body["message"]] * n
+        return [None] * n
+
         raise e
         
     list_response = []
@@ -289,6 +411,110 @@ def extract_top_logprobs(response_choice,guided_choice):
         list_logprobs.append(token_info.logprob)
         cumulative_sum+=token_info.logprob
     return dic_logprobs
+
+
+def execute_shell_command(command: str) -> subprocess.Popen:
+    """
+    Execute a shell command and return its process handle.
+    """
+    command = command.replace("\\\n", " ").replace("\\", " ")
+    parts = command.split()
+    return subprocess.Popen(parts, text=True, stderr=subprocess.STDOUT)
+
+def wait_for_server(base_url: str, timeout: int = None) -> None:
+    """Wait for the server to be ready by polling the /v1/models endpoint.
+
+    Args:
+        base_url: The base URL of the server
+        timeout: Maximum time to wait in seconds. None means wait forever.
+    """
+    start_time = time.perf_counter()
+    while True:
+        try:
+            response = requests.get(
+                f"{base_url}/v1/models",
+                headers={"Authorization": "Bearer None"},
+            )
+            if response.status_code == 200:
+                time.sleep(5)
+
+                break
+
+            if timeout and time.perf_counter() - start_time > timeout:
+                raise TimeoutError("Server did not become ready within timeout period")
+        except requests.exceptions.RequestException:
+            time.sleep(1)
+
+# stuff to terùminate the process and release the port
+import threading
+import signal
+import psutil
+import os
+import sys
+import weakref
+process_socket_map = weakref.WeakKeyDictionary()
+
+
+def terminate_process(process):
+    """
+    Terminate the process and automatically release the reserved port.
+    """
+
+    kill_process_tree(process.pid)
+
+    lock_socket = process_socket_map.pop(process, None)
+    if lock_socket is not None:
+        release_port(lock_socket)
+
+def release_port(lock_socket):
+    """
+    Release the reserved port by closing the lock socket.
+    """
+    try:
+        lock_socket.close()
+    except Exception as e:
+        print(f"Error closing socket: {e}")
+
+
+
+def kill_process_tree(parent_pid, include_parent: bool = True, skip_pid: int = None):
+    """Kill the process and all its child processes."""
+    # Remove sigchld handler to avoid spammy logs.
+    if threading.current_thread() is threading.main_thread():
+        signal.signal(signal.SIGCHLD, signal.SIG_DFL)
+
+    if parent_pid is None:
+        parent_pid = os.getpid()
+        include_parent = False
+
+    try:
+        itself = psutil.Process(parent_pid)
+    except psutil.NoSuchProcess:
+        return
+
+    children = itself.children(recursive=True)
+    for child in children:
+        if child.pid == skip_pid:
+            continue
+        try:
+            child.kill()
+        except psutil.NoSuchProcess:
+            pass
+
+    if include_parent:
+        try:
+            if parent_pid == os.getpid():
+                itself.kill()
+                sys.exit(0)
+
+            itself.kill()
+
+            # Sometime processes cannot be killed with SIGKILL (e.g, PID=1 launched by kubernetes),
+            # so we send an additional signal to kill them.
+            itself.send_signal(signal.SIGQUIT)
+        except psutil.NoSuchProcess:
+            pass
+
 
 
 if __name__ == "__main__":
