@@ -17,6 +17,8 @@ parser.add_argument("--long", action=argparse.BooleanOptionalAction, default=Fal
 parser.add_argument("--local_server", action=argparse.BooleanOptionalAction, default=True, help="Use local server for LLM")
 parser.add_argument("--sglang", action=argparse.BooleanOptionalAction, help="use sglang")
 parser.add_argument("--save_every_n_generations", type=int, default=5)
+parser.add_argument("--n_problem_to_gen", type=int, default=5, help ="Number of problem to generate for each prompt (batch_size * n_problem_to_gen = number of generated puzzles)")
+parser.add_argument("--batch_size", type=int, default=32, help="Number of query to send to the LLM to create new puzzles (multiple this number by n_problem_to_gen to get the number of generated puzzles as n_problem_to_gen puzzles are generated per query)")
 parser.add_argument("--dev", action=argparse.BooleanOptionalAction, help="Development mode")
 parser.add_argument("--log_level", type=str, default="info", help="Log level for sglang/vllm server")
 
@@ -27,6 +29,8 @@ parser.add_argument("--min_p", type=float, default=0.0, help="Min_p for sampling
 parser.add_argument("--top_p", type=float, default=1.0, help="Top-p sampling parameter")
 parser.add_argument("--top_k", type=int, default=-1, help="Top-k sampling parameter, -1 for no top-k")
 parser.add_argument("--fp8", action=argparse.BooleanOptionalAction, help="fp8")
+parser.add_argument("--enable_thinking", action=argparse.BooleanOptionalAction, help="enable thinking mode for qwen3 models")
+
 
 
 args = parser.parse_args()
@@ -105,6 +109,13 @@ for model in list_model:
     extra += f" --log_level {args.log_level}"
     extra += f" --save_every_n_generations {args.save_every_n_generations}"    
     extra += f" --temperature_labeller {args.temperature_labeller}"
+    if args.n_problem_to_gen:
+        extra += f" --n_problem_to_gen {args.n_problem_to_gen}"
+    if args.batch_size:
+        extra += f" --batch_size {args.batch_size}"
+    if args.enable_thinking:
+        extra += " --enable_thinking"
+        
     if args.fp8:
         extra += " --fp8"
     else:
