@@ -45,7 +45,7 @@ def launch_vllm_serv(model_path: str, gpu: int = 1, max_model_length=20000, port
     return server_process
 
 def launch_sglang_serv(model_path: str, gpu: int = 1, max_model_length=20000, port: int = 8000, fp8: bool = False, gpu_memory=0.9, seed: int = 0, log_level="info", add_yarn=False):
-    command = f"python -m sglang.launch_server --model-path {model_path} --tp {gpu} --context-length {max_model_length}  --port {port} --mem-fraction-static {gpu_memory} --random-seed {seed} --host 0.0.0.0 --log-level {log_level} "
+    command = f"python -m sglang.launch_server --model-path {model_path} --tp {gpu} --port {port} --mem-fraction-static {gpu_memory} --random-seed {seed} --host 0.0.0.0 --log-level {log_level} "
     if fp8:
         command += "--quantization fp8 "
 
@@ -55,10 +55,11 @@ def launch_sglang_serv(model_path: str, gpu: int = 1, max_model_length=20000, po
         if max_model_length < base_model_len:
             pass
         elif max_model_length < 2* base_model_len:
-            command += """--json-model-override-args '{"rope_scaling":{"rope_type":"yarn","factor":2.0,"original_max_position_embeddings":32768}}' --context-length 65536 """
+            command += '--json-model-override-args '+ '{"rope_scaling":{"rope_type":"yarn","factor":2.0,"original_max_position_embeddings":32768}}'+' --context-length 65536 '
         elif max_model_length < 4* base_model_len:
-            command += """--json-model-override-args '{"rope_scaling":{"rope_type":"yarn","factor":4.0,"original_max_position_embeddings":32768}}' --context-length 131072 """
-
+            command += '--json-model-override-args '+'{"rope_scaling":{"rope_type":"yarn","factor":4.0,"original_max_position_embeddings":32768}}'+' --context-length 131072 '
+        else:
+            command += "--context-length {max_model_length} "
     server_process = execute_shell_command(
         command
     )
@@ -358,7 +359,6 @@ def extract_top_logprobs_offline(list_log,guided_choice):
     return dic_logprobs 
 
 def get_multiple_completions_judge_offline(guided_choice,llm,batch_prompt: list[list], cfg_generation: dict={}, max_workers=90, temperature=None, n=1)->list[list[str]]:
-        
         cfg_generation = copy.deepcopy(cfg_generation)
         if not "extra_body" in cfg_generation:
                 cfg_generation["extra_body"] ={}
