@@ -45,7 +45,7 @@ def launch_vllm_serv(model_path: str, gpu: int = 1, max_model_length=20000, port
     return server_process
 
 def launch_sglang_serv(model_path: str, gpu: int = 1, max_model_length=20000, port: int = 8000, fp8: bool = False, gpu_memory=0.9, seed: int = 0, log_level="info", add_yarn=False):
-    command = f"python -m sglang.launch_server --model-path {model_path} --tp {gpu} --port {port} --mem-fraction-static {gpu_memory} --random-seed {seed} --host 0.0.0.0 --log-level {log_level} "
+    command = f"python -m sglang.launch_server --model-path {model_path} --tp {gpu} --port {port} --mem-fraction-static {gpu_memory} --random-seed {seed} --host 0.0.0.0 --log-level {log_level} --trust-remote-code "
     if fp8:
         command += "--quantization fp8 "
 
