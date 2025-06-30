@@ -19,7 +19,7 @@ def launch_vllm_serv(model_path: str, gpu: int = 1, max_model_length=20000, port
     command = f"vllm serve {model_path} --tensor-parallel-size {gpu} --max-model-len {max_model_length}  --port {port} --gpu-memory-utilization {gpu_memory} --seed {seed} --trust-remote-code --uvicorn-log-level {log_level} "
     if fp8:
         command += "--quantization fp8 "
-    list_mistral = ["Mistral-Small-3.2-24B-Instruct-2506","Mistral-Large-Instruct","Codestral-22B-v0.1","Devstral-Small-2505"] 
+    list_mistral = ["Mistral-Small-3.2-24B-Instruct-2506","Mistral-Large-Instruct","Codestral-22B-v0.1","Devstral-Small-2505","Magistral-Small-2506"] 
     for model_name in list_mistral:
         if model_name in model_path:
             command += "--tokenizer_mode mistral --config_format mistral --load_format mistral "
