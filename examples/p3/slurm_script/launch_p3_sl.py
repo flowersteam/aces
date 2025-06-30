@@ -30,8 +30,8 @@ parser.add_argument("--top_p", type=float, default=1.0, help="Top-p sampling par
 parser.add_argument("--top_k", type=int, default=-1, help="Top-k sampling parameter, -1 for no top-k")
 parser.add_argument("--fp8", action=argparse.BooleanOptionalAction, help="fp8")
 parser.add_argument("--enable_thinking", action=argparse.BooleanOptionalAction, help="enable thinking mode for qwen3 models")
-
-
+parser.add_argument("--max_model_length", type=int, default=-1, help="Max model length (context size) for the LLM, default is 8192")
+parser.add_argument("--max_tokens", type=int, default=-1, help="Max generated tokens for the LLM, default is 8192")
 
 args = parser.parse_args()
 
@@ -115,7 +115,11 @@ for model in list_model:
         extra += f" --batch_size {args.batch_size}"
     if args.enable_thinking:
         extra += " --enable_thinking"
-        
+    if args.max_model_length!= -1:
+        extra += f" --max_model_length {args.max_model_length}"
+    if args.max_tokens!= -1:
+        extra += f" --max_tokens {args.max_tokens}"
+
     if args.fp8:
         extra += " --fp8"
     else:

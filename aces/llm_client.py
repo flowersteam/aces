@@ -15,7 +15,7 @@ class Response:
         self.response = response
         self.logprobs = logprobs
 
-def launch_vllm_serv(model_path: str, gpu: int = 1, max_model_length=20000, port: int = 8000, fp8: bool = False, gpu_memory=0.9, seed: int = 0, log_level="info"):
+def launch_vllm_serv(model_path: str, gpu: int = 1, max_model_length=20000, port: int = 8000, fp8: bool = False, gpu_memory=0.9, seed: int = 0, log_level="info", add_yarn=False):
     command = f"vllm serve {model_path} --tensor-parallel-size {gpu} --max-model-len {max_model_length}  --port {port} --gpu-memory-utilization {gpu_memory} --seed {seed} --trust-remote-code --uvicorn-log-level {log_level} "
     if fp8:
         command += "--quantization fp8 "
@@ -23,6 +23,16 @@ def launch_vllm_serv(model_path: str, gpu: int = 1, max_model_length=20000, port
     for model_name in list_mistral:
         if model_name in model_path:
             command += "--tokenizer_mode mistral --config_format mistral --load_format mistral "
+
+    # for qwq and qwen 3 model
+    if add_yarn:
+        base_model_len = 32768
+        if max_model_length < base_model_len:
+        elif max_model_length < 2* base_model_len:
+            command += """--rope-scaling '{"rope_type":"yarn","factor":2.0,"original_max_position_embeddings":32768}' --max-model-len 65536 """
+        elif max_model_length < 4* base_model_len:
+            command +="""--rope-scaling '{"rope_type":"yarn","factor":4.0,"original_max_position_embeddings":32768}' --max-model-len 131072 """
+
     server_process = execute_shell_command(
         command
     )
@@ -33,11 +43,21 @@ def launch_vllm_serv(model_path: str, gpu: int = 1, max_model_length=20000, port
     # --enable-reasoning
     return server_process
 
-def launch_sglang_serv(model_path: str, gpu: int = 1, max_model_length=20000, port: int = 8000, fp8: bool = False, gpu_memory=0.9, seed: int = 0, log_level="info"):
+def launch_sglang_serv(model_path: str, gpu: int = 1, max_model_length=20000, port: int = 8000, fp8: bool = False, gpu_memory=0.9, seed: int = 0, log_level="info", add_yarn=False):
     command = f"python -m sglang.launch_server --model-path {model_path} --tp {gpu} --context-length {max_model_length}  --port {port} --mem-fraction-static {gpu_memory} --random-seed {seed} --host 0.0.0.0 --log-level {log_level} "
     if fp8:
         command += "--quantization fp8 "
-        
+
+    # for qwq and qwen 3 model
+    if add_yarn:
+        base_model_len = 32768
+        if max_model_length < base_model_len:
+            pass
+        elif max_model_length < 2* base_model_len:
+            command += """--json-model-override-args '{"rope_scaling":{"rope_type":"yarn","factor":2.0,"original_max_position_embeddings":32768}}' --context-length 65536 """
+        elif max_model_length < 4* base_model_len:
+            command += """--json-model-override-args '{"rope_scaling":{"rope_type":"yarn","factor":4.0,"original_max_position_embeddings":32768}}' --context-length 131072 """
+
     server_process = execute_shell_command(
         command
     )
@@ -127,11 +147,15 @@ class LLMClient:
             if self.sglang:
                 server_process = launch_sglang_serv(model_path=self.model_path, gpu= self.gpu,
                                                 max_model_length=self.max_model_length, port= port,
-                                                fp8 = self.fp8, gpu_memory=self.gpu_memory, seed = self.seed, log_level = self.log_level)
+                                                fp8 = self.fp8, gpu_memory=self.gpu_memory, 
+                                                seed = self.seed, log_level = self.log_level,
+                                                add_yarn=self.qwen3 or "qwq" in self.model_path.lower())
             else:
                 server_process = launch_vllm_serv(model_path=self.model_path, gpu= self.gpu,
                                                 max_model_length=self.max_model_length, port= port,
-                                                fp8 = self.fp8, gpu_memory=self.gpu_memory, seed = self.seed, log_level = self.log_level)
+                                                fp8 = self.fp8, gpu_memory=self.gpu_memory, 
+                                                seed = self.seed, log_level = self.log_level,
+                                                add_yarn = self.qwen3 or "qwq" in self.model_path.lower())
             print("check server run 0")
             is_running = check_server_run(self.model_path,port,server_process,vllm=not self.sglang)
             if not is_running:
@@ -215,6 +239,9 @@ class LLMClient:
             print(f"Error terminating server process: {e}")
 
     def multiple_completion(self, batch_prompt,judge=False,guided_choice=["1","2"],n=1,temperature=None):
+        if "magistral" in self.model_path.lower():
+            batch_prompt = self.patch_magistral(batch_prompt)
+
         if self.online:
             # if judge:
             #     return get_multiple_completions_judge(guided_choice, self.client, batch_prompt, cfg_generation=self.cfg_generation)
@@ -226,6 +253,22 @@ class LLMClient:
             # else:
             return get_completion_offline(self.llm, batch_prompt, cfg_generation=self.cfg_generation,n=n,temperature=temperature,qwen3=self.qwen3)
     
+    def add_reasoning_system_prompt(self, batch_prompt):
+        """Prepend the system prompt to each message in the batch."""
+        model = self.model_path.lower()
+        if "magistral" in model:
+            sys_prompt = magistral_sys_prompt
+        elif "llama-3_3-nemotron-super-49b-v1" in model:
+            sys_prompt =  f"detailed thinking {self.enable_thinking}"
+        else:
+            return batch_prompt
+        patched_batch = []
+        for message in batch_prompt:
+            # Find the user message content
+            patched_message = [{"role": "system", "content": magistral_sys_prompt}] + message
+            patched_batch.append(patched_message)
+        return patched_batch
+
 
 def is_server_up(base_url):
     attempt=50
@@ -536,6 +579,16 @@ def kill_process_tree(parent_pid, include_parent: bool = True, skip_pid: int = N
         except psutil.NoSuchProcess:
             pass
 
+magistral_sys_prompt = """A user will ask you to solve a task. You should first draft your thinking process (inner monologue) until you have derived the final answer. Afterwards, write a self-contained summary of your thoughts (i.e. your summary should be succinct but contain all the critical steps you needed to reach the conclusion). You should use Markdown and Latex to format your response. Write both your thoughts and summary in the same language as the task posed by the user.
+
+Your thinking process must follow the template below:
+<think>
+Your thoughts or/and draft, like working through an exercise on scratch paper. Be as casual and as long as you want until you are confident to generate a correct answer.
+</think>
+
+Here, provide a concise summary that reflects your reasoning and presents a clear final answer to the user.
+
+Problem:"""
 
 
 if __name__ == "__main__":
