@@ -151,7 +151,7 @@ def get_programming_puzzles_prompt(
         for idx in idx_skill_targeted:
             skill_puzzle_i += f"\n* {skill_list[idx]}"
 
-        examples += f"\nPuzzle {i}:\nPuzzle description: {puzzle_description}{prompt_cot_fitness}{skill_puzzle_i}\n\n```python\n{puzzle.program_str}\n```\n"    
+        examples += f"\nPuzzle {i}:\nPuzzle description: {puzzle_description}{prompt_cot_fitness}{skill_puzzle_i}\n\n```python\n{puzzle.program_str.strip()}\n```\n"    
 
     skill_target=":"
     idx_skill_targeted = [idx for idx, val in enumerate(skill_targeted) if val]

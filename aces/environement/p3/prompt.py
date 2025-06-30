@@ -72,6 +72,8 @@ Generate {n_problem} P3 similar to previous Examples. Ensure that all new puzzle
 
 prompt_aces_elm= """Consider Python Programming Puzzles (P3). P3 consists of two functions: a problem function `f` and its corresponding solution `g`. The challenge lies in constructing a SAT problem `f` and a function `g` such that `f(g())` evaluates to `True`
 
+Your goal is to generate {n_problem} new Python programming puzzles that are challenging, while ensuring that they include all the required skills.
+
 ## Main Rules:
 - Each puzzle includes two functions: `def f(...)` and `def g(...)`.
 - The first argument of `f` is always the output from `g()`.
@@ -98,12 +100,12 @@ assert f(g()) == True
 
 ## Examples:
 {examples}
-
 Generate {n_problem} P3 similar to the last Examples (Puzzle {idx_last_puzzle}). Ensure that all new puzzles are more challenging than Puzzle {idx_last_puzzle}.
 {extra}
 
 **Please make sure that new puzzles have JUST ALL the following skills**{skill_target}
-## New {n_problem} problems inspired by Puzzle {idx_last_puzzle}:
+
+## Now you need to generate {n_problem} new P3 inspired by Puzzle {idx_last_puzzle}:
 """
 
 instruction_solve_puzzle = '''You will be given a function. Respond only in code with a correct, efficient implementation of the function. You will need to generate the correct solutions (g), for the Problem 2 that satisfies the condition f(g()) == True.
