@@ -4,7 +4,8 @@ class P3:
                   idx_generation: int=-1,target_skills=None,fitness: int =None, 
                   description:str=" description of the puzzle", puzzles_id_fewshot:list[str]=[],
                   result_obj: Optional[dict]={}, explanation_emb=None,
-                  all_solution:List[str]=None, all_solution_correct:List[bool]=None,unique_id:str=None) -> None:
+                  all_solution:List[str]=None, all_solution_correct:List[bool]=None,unique_id:str=None,
+                  reasoning_problem_generation=None,all_solution_reasoning=None) -> None:
         """
         Genotype for a programming puzzle problem+solution pair.
         Args:
