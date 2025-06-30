@@ -113,6 +113,7 @@ def get_programming_puzzles_prompt(
         skill_targeted: Optional[List[int]]=None,
         puzzle_generation_strategy = "aces",
         difficulty_range=(90,100),
+        n_problem_to_gen =5
 
     ):
     """
@@ -158,7 +159,10 @@ def get_programming_puzzles_prompt(
         skill_target += f"\n- {skill_list[idx]}"
 
     extra_prompt += f"You should aim to generate puzzles with a Difficulty score between {difficulty_range[0]} and {difficulty_range[1]} out of 100."
-    prompt = prompt.format(examples=examples,skill_target=skill_target,extra=extra_prompt)
+    if puzzle_generation_strategy == "aces_elm":
+        prompt = prompt.format(examples=examples,skill_target=skill_target,extra=extra_prompt,n_problem=n_problem_to_gen,idx_last_puzzle=len(list_few_shot_example)-1)
+    else:
+        prompt = prompt.format(examples=examples,skill_target=skill_target,extra=extra_prompt,n_problem=n_problem_to_gen)
 
     return prompt
 

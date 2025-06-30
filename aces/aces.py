@@ -79,10 +79,22 @@ class ACES_base:
                              fp8 = self.llm_args.fp8,
                              gpu_memory = self.llm_args.gpu_memory,
                              sglang=self.llm_args.sglang,
-                             log_level= self.llm_args.log_level
+                             log_level= self.llm_args.log_level,
+                             enable_thinking = self.llm_args.enable_thinking
                             )
         print("LLM client initialized")
+
+
+    def exctract_reasoning_response(self, response: str) -> str:
+        """Extract reasoning from the response"""
+        reasoning = None
+        sol = response
+        if "</think>" in response:
+            reasoning = response.split("</think>")[0].strip() + "</think>"
+            sol = response.split("</think>:")[1].strip()
+        return reasoning, sol
     
+
     def initialize_environment(self) -> None:
         if self.aces_args.path_checkpoint_archive == "":
             print("load initial archive: ", self.aces_args.path_archive)

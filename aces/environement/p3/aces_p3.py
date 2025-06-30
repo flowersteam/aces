@@ -111,18 +111,27 @@ class ACES_p3(ACES_base):
         assert len(list_solutions) == len(puzzles)
         for id_puzzle in range(len(puzzles)):
             problem = puzzles[id_puzzle].program_str 
-            n_solutions = [self.process_solutions(solution=sol,problem=problem) for sol in list_solutions[id_puzzle].response]
+
+            reasoning_n_solutions = []
+            n_solutions = []
+            for sol in list_solutions[id_puzzle].response:
+                # process solution
+                reasoning, sol = self.exctract_reasoning_response(sol)
+                reasoning_n_solutions.append(reasoning)
+                n_solutions.append(self.process_solutions(solution=sol, problem=problem))
             puzzles[id_puzzle].all_solution = n_solutions
+            puzzles[id_puzzle].all_solution_reasoning = reasoning_n_solutions
         # don't forget to verify solution with python
         return puzzles
     
 
     def process_solutions(self, solution: str, problem: str) -> str: 
-        """Process solution and return full puzzle (f+g)"""
+        """Process solution and return full puzzle (f+g)"""        
         just_problem = extract_f(problem) 
         solution = extract_solution(solution)
         try:
-            name_functions_problem = extract_function_name(just_problem)
+            # rm all functions that are overwritten by the solution
+            name_functions_problem = extract_function_name(just_problem) 
             solution = rm_given_function(solution, name_functions_problem)
         except:
             #solution is not ast parsable so it is incorrect
@@ -193,9 +202,13 @@ class ACES_p3(ACES_base):
         list_skills = self.llm.multiple_completion(list_prompt_chat,temperature = self.llm_args.temperature_labeller)
         assert len(list_skills) == len(puzzles)
         for i in range(len(puzzles)):
-            skill, explanation_skill = extract_skill(list_skills[i].response[0],n_skills=len(self.skill_list))
+            reasoning, sol = self.exctract_reasoning_response(list_skills[0].response[0])
+            skill, explanation_skill = extract_skill(sol,n_skills=len(self.skill_list))
             puzzles[i].emb = skill
-            puzzles[i].explanation_emb = explanation_skill
+            if reasoning is not None:
+                puzzles[i].explanation_emb = reasoning + sol
+            else:
+                puzzles[i].explanation_emb = sol
             # puzzle[i].phenotype = skill
         return puzzles
     
@@ -207,7 +220,8 @@ class ACES_p3(ACES_base):
             list_prompt.append(get_prompt_description_p3(p.program_str))
         list_description = self.llm.multiple_completion(self.formating_chat_prompt(list_prompt))
         for i in range(len(puzzles)):
-            puzzles[i].description = list_description[i].response[0]
+            reasoning, description = self.exctract_reasoning_response(list_description[i].response[0])
+            puzzles[i].description = description
         return puzzles
 
     def generate_new_problems(self,list_goal_with_examples):
@@ -220,7 +234,8 @@ class ACES_p3(ACES_base):
             list_goal.append(goal)
             prompt = get_programming_puzzles_prompt(list_few_shot_example_phenotypes,goal,
                         puzzle_generation_strategy = self.aces_args.puzzle_generation_strategy,
-                        difficulty_range = difficulty_range)
+                        difficulty_range = difficulty_range,
+                        n_problem_to_gen = self.aces_args.n_problem_to_gen)
             
             list_prompt.append(prompt)
 
@@ -231,12 +246,18 @@ class ACES_p3(ACES_base):
         list_new_p3 = []
         
         for id_puzzle,puzzle in enumerate(news_puzzles):
+            reasoning, puzzle = self.exctract_reasoning_response(puzzle)
             split_puzzles = puzzle.replace("```python","```").replace("``` python","```").split("```")
             for idx in range(len(split_puzzles)):
                 if "def f" in split_puzzles[idx] and "def g" in split_puzzles[idx]:
                     split_puzzles[idx] = split_puzzles[idx].split("\nassert f(")[0]
                     split_puzzles[idx] = split_puzzles[idx] + "\nassert f(g()) == True\n"
-                    new_p3 = P3(split_puzzles[idx],target_skills=list_goal[id_puzzle],puzzles_id_fewshot=list_few_shot_ex_id[id_puzzle], idx_generation=self.idx_generation)
+                    new_p3 = P3(split_puzzles[idx],
+                                target_skills=list_goal[id_puzzle],
+                                puzzles_id_fewshot=list_few_shot_ex_id[id_puzzle], 
+                                idx_generation=self.idx_generation,
+                                reasoning_problem_generation = reasoning
+                                )
                     list_new_p3.append(new_p3)
         return list_new_p3
 

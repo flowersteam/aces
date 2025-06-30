@@ -84,18 +84,35 @@ def extract_arguments_except_first_specific(func_code, function_name='f') -> str
     
     return ', '.join(result)
 
-def extract_solution(out) -> str:
-    """exctract solution"""
-    try:
-        solution = out.replace("```python","```").replace("```\n","```")
-        if "```" in solution:
-            solution = solution.split("```")[1]
+# def extract_solution(out) -> str:
+#     """exctract solution"""
+#     try:
+#         solution = out.replace("```python","```").replace("```\n","```")
+#         if "```" in solution:
+#             solution = solution.split("```")[1]
 
+#         else:
+#             solution = solution
+#     except:
+#         solution = ""
+#     return solution
+
+def extract_solution(out) -> str:
+    """Extract the last Python code block including 'g'."""
+    try:
+        solution = out.replace("```python", "```").replace("```\n", "```")
+        code_blocks = solution.split("```")
+        # Find the last code block that contains 'def g'
+        for block in reversed(code_blocks):
+            if "def g" in block:
+                return block.strip()
+        # Fallback: return the last code block if 'def g' not found
+        if len(code_blocks) > 1:
+            return code_blocks[-2].strip()
         else:
-            solution = solution
-    except:
-        solution = ""
-    return solution
+            return solution
+    except Exception:
+        return ""
 
 def extract_skill(out,n_skills) -> list[list[int],str]:
     """exctract list of sem"""

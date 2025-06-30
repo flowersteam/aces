@@ -37,6 +37,7 @@ def launch_sglang_serv(model_path: str, gpu: int = 1, max_model_length=20000, po
     command = f"python -m sglang.launch_server --model-path {model_path} --tp {gpu} --context-length {max_model_length}  --port {port} --mem-fraction-static {gpu_memory} --random-seed {seed} --host 0.0.0.0 --log-level {log_level} "
     if fp8:
         command += "--quantization fp8 "
+        
     server_process = execute_shell_command(
         command
     )
@@ -86,7 +87,7 @@ class LLMClient:
                   api_key: str, online: bool = False, gpu=1,
                     max_model_length=20000, azure=False,
                     local_server=False, seed=0, fp8=False, gpu_memory=0.9,
-                    sglang= False, log_level="info"):
+                    sglang= False, log_level="info",enable_thinking=False):
         self.model_path = model
         self.cfg_generation = cfg_generation
         self.base_url = base_url
@@ -104,7 +105,14 @@ class LLMClient:
         self.gpu_memory = gpu_memory
         self.sglang = sglang
         self.log_level = log_level # default log level for sglang
+        self.enable_thinking = enable_thinking 
 
+        if self.qwen3:
+            if not "extra_body" in self.cfg_generation:
+                self.cfg_generation["extra_body"] = {}
+            
+            self.cfg_generation["extra_body"].update({"chat_template_kwargs":{"enable_thinking": self.enable_thinking}})
+        self.reasoning_parser = ""
         if online:
             self.init_client()
         else:
@@ -167,6 +175,21 @@ class LLMClient:
             print("Server is down or unreachable")
             raise Exception("Server is down or unreachable")
 
+
+    def get_reasing_parser(self):
+        """not use for now, (just split based on "</think>')"""
+        model = self.model_path.lower()
+        self.reasoning_parser =""
+        if self.qwen3 and self.enable_thinking:
+            self.reasoning_parser = "qwen3" 
+        if "qwq" in model:
+            self.reasoning_parser = "deepseek-r1"
+        if "r1" in model:
+            self.reasoning_parser = "deepseek-r1"
+        if "deepcoder" in model:
+            self.reasoning_parser = "deepseek-r1"
+
+
     def init_offline_model(self):
         from vllm import LLM
         # switch dtype to half if GPUs with compute capability is inferior to 8.0
@@ -196,11 +219,6 @@ class LLMClient:
             # if judge:
             #     return get_multiple_completions_judge(guided_choice, self.client, batch_prompt, cfg_generation=self.cfg_generation)
             # else:
-            if self.qwen3:
-                if not "extra_body" in self.cfg_generation:
-                    self.cfg_generation["extra_body"] = {}
-                
-                self.cfg_generation["extra_body"].update({"chat_template_kwargs":{"enable_thinking": False}})
             return get_multiple_completions(self.client, batch_prompt, cfg_generation=self.cfg_generation,n=n,temperature=temperature)
         else:
             # if judge:

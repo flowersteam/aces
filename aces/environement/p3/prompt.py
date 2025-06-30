@@ -62,11 +62,11 @@ assert f(g()) == True
 ## Examples:
 {examples}
 
-Generate 5 P3 similar to previous Examples. Ensure that all new puzzles are more challenging than Puzzle from previous examples.
+Generate {n_problem} P3 similar to previous Examples. Ensure that all new puzzles are more challenging than Puzzle from previous examples.
 {extra}
 
 **Please make sure that new puzzles have JUST ALL the following skills**{skill_target}
-## New 5 problems:
+## New {n_problem} problems:
 """
 
 
@@ -99,11 +99,11 @@ assert f(g()) == True
 ## Examples:
 {examples}
 
-Generate 5 P3 similar to the last Examples (Puzzle 2). Ensure that all new puzzles are more challenging than Puzzle 2.
+Generate {n_problem} P3 similar to the last Examples (Puzzle {idx_last_puzzle}). Ensure that all new puzzles are more challenging than Puzzle {idx_last_puzzle}.
 {extra}
 
 **Please make sure that new puzzles have JUST ALL the following skills**{skill_target}
-## New 5 problems inspired by Puzzle 2:
+## New {n_problem} problems inspired by Puzzle {idx_last_puzzle}:
 """
 
 instruction_solve_puzzle = '''You will be given a function. Respond only in code with a correct, efficient implementation of the function. You will need to generate the correct solutions (g), for the Problem 2 that satisfies the condition f(g()) == True.
@@ -189,8 +189,8 @@ assert f(g()) == True
 ## Examples:
 {examples}
 
-Generate 5 different P3 similar to previous Examples.
+Generate {n_problem} different P3 similar to previous Examples.
 {extra}
 
-## New 5 problems:
+## New {n_problem} problems:
 """

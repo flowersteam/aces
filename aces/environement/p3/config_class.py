@@ -28,7 +28,11 @@ class AcesArguments:
     )
     batch_size: int = field( 
         default = 32, 
-        metadata={"help": "number of query to send to the LLM to create new puzzles (multiple this number by 5 to get the number of generated puzzles as 5 puzzles are generated per query)"})
+        metadata={"help": "number of query to send to the LLM to create new puzzles (multiple this number by n_problem_to_gen to get the number of generated puzzles as n_problem_to_gen puzzles are generated per query)"})
+    n_problem_to_gen: int = field(
+        default=5,
+        metadata={"help":"number of problem to generate for each prompt (batch_size * n_problem_to_gen = number of generated puzzles)"}
+)
     n_fewshot_examples: int = field( default = 3, metadata={"help": "number of example in context" })
     max_descriptor_targeted: int = field(
         default = 5,
@@ -54,6 +58,7 @@ class AcesArguments:
     path_checkpoint_archive: str = field(
         default="",
         metadata={"help":"if != '' resume experiment from the given a archive checkpoint "})
+
     
 
 @dataclass
@@ -173,5 +178,11 @@ class LLMArguments:
         metadata={
             "help": """log level for sglang {critical,error,warning,info,debug,trace}
             for vllm server {debug,info,warning,error,critical,trace}"""
+        },
+    )
+    enable_thinking: bool = field(
+        default=False,
+        metadata={
+            "help": "enable thinking for the LLM (for hybrid model, e.g qwen3)"
         },
     )
