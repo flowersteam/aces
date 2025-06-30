@@ -53,7 +53,9 @@ class ACES_base:
     def init_llm(self,) -> None:
         """init LLM client"""
         print("init LLM client")
-        cfg_generation = {"model": self.llm_args.model_name_or_path, "temperature": self.llm_args.temperature,"max_tokens": self.llm_args.max_tokens}
+        cfg_generation = {"model": self.llm_args.model_name_or_path, "temperature": self.llm_args.temperature}
+        if self.llm_args.max_tokens!= -1:
+            cfg_generation["max_tokens"] = self.llm_args.max_tokens
         if self.llm_args.min_p!=0:
             if "extra_body" not in cfg_generation:
                 cfg_generation["extra_body"] = {}
@@ -89,9 +91,10 @@ class ACES_base:
         """Extract reasoning from the response"""
         reasoning = None
         sol = response
-        if "</think>" in response:
-            reasoning = response.split("</think>")[0].strip() + "</think>"
-            sol = response.split("</think>:")[1].strip()
+        think_stop_tag = "</think>"
+        if think_stop_tag in response:
+            reasoning = response.split(think_stop_tag)[0].strip() + think_stop_tag
+            sol = response.split(think_stop_tag)[1].strip()
         return reasoning, sol
     
 

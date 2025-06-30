@@ -28,6 +28,7 @@ def launch_vllm_serv(model_path: str, gpu: int = 1, max_model_length=20000, port
     if add_yarn:
         base_model_len = 32768
         if max_model_length < base_model_len:
+            pass
         elif max_model_length < 2* base_model_len:
             command += """--rope-scaling '{"rope_type":"yarn","factor":2.0,"original_max_position_embeddings":32768}' --max-model-len 65536 """
         elif max_model_length < 4* base_model_len:
