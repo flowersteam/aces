@@ -241,8 +241,7 @@ class LLMClient:
             print(f"Error terminating server process: {e}")
 
     def multiple_completion(self, batch_prompt,judge=False,guided_choice=["1","2"],n=1,temperature=None):
-        if "magistral" in self.model_path.lower():
-            batch_prompt = self.patch_magistral(batch_prompt)
+        batch_prompt = self.add_reasoning_system_prompt(batch_prompt)
 
         if self.online:
             # if judge:
