@@ -53,13 +53,14 @@ def launch_sglang_serv(model_path: str, gpu: int = 1, max_model_length=20000, po
     if add_yarn:
         base_model_len = 32768
         if max_model_length < base_model_len:
-            pass
+            command += "--context-length {max_model_length} "
         elif max_model_length < 2* base_model_len:
             command += '--json-model-override-args '+ '{"rope_scaling":{"rope_type":"yarn","factor":2.0,"original_max_position_embeddings":32768}}'+' --context-length 65536 '
         elif max_model_length < 4* base_model_len:
             command += '--json-model-override-args '+'{"rope_scaling":{"rope_type":"yarn","factor":4.0,"original_max_position_embeddings":32768}}'+' --context-length 131072 '
-        else:
-            command += "--context-length {max_model_length} "
+    else:
+        command += f"--context-length {max_model_length} "
+            
     server_process = execute_shell_command(
         command
     )
@@ -114,7 +115,7 @@ class LLMClient:
         self.cfg_generation = cfg_generation
         self.base_url = base_url
         self.api_key = api_key
-        self.timeout = 60*20 # 20 minutes timeout
+        self.timeout = 60*60*2 # 2 h timeout
         self.online = online
         self.gpu = gpu
         self.max_model_length = max_model_length
