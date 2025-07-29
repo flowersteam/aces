@@ -10,7 +10,7 @@ parser.add_argument("--num_solutions", type=int, default=50)
 parser.add_argument("--seed", type=int, default=0)
 parser.add_argument("--model_name_or_path", type=str, default="model_sweep")
 parser.add_argument("--path_checkpoint_archive", type=str, default="")
-parser.add_argument("--gpu", type=int, default=1)
+parser.add_argument("--gpu", type=int, default=1, help="Number of GPUs to use per nodes(default: 1)")
 parser.add_argument("--gpu_memory", type=float, default=0.9, help="GPU memory usage percentage (default: 0.9)")
 parser.add_argument("--only_print", action=argparse.BooleanOptionalAction, default=False)
 parser.add_argument("--long", action=argparse.BooleanOptionalAction, default=False)
@@ -33,6 +33,8 @@ parser.add_argument("--enable_thinking", action=argparse.BooleanOptionalAction, 
 parser.add_argument("--max_model_length", type=int, default=-1, help="Max model length (context size) for the LLM, default is 8192")
 parser.add_argument("--max_tokens", type=int, default=-1, help="Max generated tokens for the LLM, default is 8192")
 parser.add_argument("--ep_moe", action=argparse.BooleanOptionalAction, help="Enable EP for MoE models")
+# nodes
+parser.add_argument("--nodes", type=int, default=1, help="Number of nodes to use for the job")
 args = parser.parse_args()
 
 if args.long:
@@ -49,7 +51,7 @@ script_template="""#!/bin/bash
 #SBATCH -C h100
 #SBATCH --job-name={job_name}
 #SBATCH --nodes=1
-#SBATCH --ntasks-per-node=1
+#SBATCH --ntasks-per-node={nodes}
 #SBATCH --gres=gpu:{gpu}
 #SBATCH --cpus-per-task={cpu}
 {qos}
@@ -134,7 +136,7 @@ for model in list_model:
     slurmfile_path = f'run_{job_name}.slurm'
     env_name = "aces_sglang49p5" if args.sglang else "aces"
     name_experience= model_id+"_"+args.name_experience +"_nsolution-"+str(args.num_solutions)+ "_seed_"+str(args.seed)
-    script = script_template.format(qos=qos,h=h,gpu=args.gpu,cpu=cpu,path_archive=args.path_archive, path_save=args.path_save, name_experience=name_experience, n_generation=args.n_generation, num_solutions=args.num_solutions, seed=args.seed, model_name_or_path=model, extra=extra, job_name=job_name,env_name=env_name,export_stuff=export_stuff,module_load=module_load)
+    script = script_template.format(qos=qos,h=h,gpu=args.gpu*args.nodes,nodes=args.nodes,cpu=cpu,path_archive=args.path_archive, path_save=args.path_save, name_experience=name_experience, n_generation=args.n_generation, num_solutions=args.num_solutions, seed=args.seed, model_name_or_path=model, extra=extra, job_name=job_name,env_name=env_name,export_stuff=export_stuff,module_load=module_load)
     if args.only_print:
         print(script)
         exit()
