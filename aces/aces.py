@@ -82,7 +82,8 @@ class ACES_base:
                              gpu_memory = self.llm_args.gpu_memory,
                              sglang=self.llm_args.sglang,
                              log_level= self.llm_args.log_level,
-                             enable_thinking = self.llm_args.enable_thinking
+                             enable_thinking = self.llm_args.enable_thinking,
+                             ep_moe=self.llm_args.ep_moe,
                             )
         print("LLM client initialized")
 

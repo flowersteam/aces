@@ -186,3 +186,9 @@ class LLMArguments:
             "help": "enable thinking for the LLM (for hybrid model, e.g qwen3)"
         },
     )
+    ep_moe: bool = field(
+        default=False,
+        metadata={
+            "help": "enable EP for MoE"
+        },
+    )

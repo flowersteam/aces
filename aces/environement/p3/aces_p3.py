@@ -1,6 +1,5 @@
 import random
 from typing import List, Dict
-from aces.llm_client import LLMClient
 from dataclasses import dataclass, field
 import json
 from aces.environement.p3.p3_genotype import P3
@@ -11,8 +10,6 @@ from aces.code_sandbox import evaluate, pass_at_k
 from aces.aces import ACES_base
 import numpy as np
 import os
-from itertools import combinations
-from scipy.spatial.distance import cdist
 import pickle
 
 os.environ["TOKENIZERS_PARALLELISM"] = "true"
