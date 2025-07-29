@@ -8,7 +8,7 @@ from openai import OpenAI, AzureOpenAI
 import requests
 from requests.exceptions import RequestException
 import time
-
+import os
 
 class Response:
     def __init__(self, response: list, logprobs):
@@ -46,6 +46,8 @@ def launch_vllm_serv(model_path: str, gpu: int = 1, max_model_length=20000, port
 
 def launch_sglang_serv(model_path: str, gpu: int = 1, max_model_length=20000, port: int = 8000, fp8: bool = False, gpu_memory=0.9, seed: int = 0, log_level="info", add_yarn=False):
     command = f"python -m sglang.launch_server --model-path {model_path} --tp {gpu} --port {port} --mem-fraction-static {gpu_memory} --random-seed {seed} --host 0.0.0.0 --log-level {log_level} --trust-remote-code "
+    if "fp8" in model_path:
+        fp8 = False
     if fp8:
         command += "--quantization fp8 "
 
@@ -70,6 +72,140 @@ def launch_sglang_serv(model_path: str, gpu: int = 1, max_model_length=20000, po
     # --reasoning-parser
     # --enable-reasoning
     return server_process
+
+def launch_sglang_serv_multi_node(model_path: str, gpu: int = 1, max_model_length=20000, port: int = 8000, port_multinode:int = 5000, fp8: bool = False, gpu_memory=0.9, seed: int = 0, log_level="info", add_yarn=False, ep_moe=False):
+    tp = gpu
+    
+    worker_num = int(os.environ.get('SLURM_NNODES', 2))
+    n_nodes = worker_num
+    SLURM_JOB_NODELIST = os.environ.get('SLURM_JOB_NODELIST')
+
+    SLURM_JOB_ID = os.environ.get('SLURM_JOB_ID')
+    nodes_result = subprocess.run(['scontrol', 'show', 'hostnames', SLURM_JOB_NODELIST], 
+                                capture_output=True, text=True)
+
+    # Split the output into individual node names
+    nodes = [node.strip() for node in nodes_result.stdout.strip().split('\n') if node.strip()]
+    head_node = nodes[0]
+
+    # Get the IP address of the head node
+    head_node_ip_result = subprocess.run(['srun', '--nodes=1', '--ntasks=1', '-w', head_node, 
+                                        'hostname', '--ip-address'], 
+                                        capture_output=True, text=True)
+    head_node_ip = head_node_ip_result.stdout.strip()
+
+    # Handle potential space-separated IP addresses (IPv4/IPv6) - take the first one
+    # head_node_ip = head_node_ip.split()[0]
+
+    # Set environment variable
+    os.environ['SGLANG_HOST_IP'] = head_node_ip
+    print(f"Head node: {head_node}, Head node IP: {head_node_ip}")
+
+    head_env = os.environ.copy()
+    head_env['OUTLINES_CACHE_DIR'] = f"/tmp/{SLURM_JOB_ID}_0"
+
+
+    print(f"{time.strftime('%Y-%m-%d %H:%M:%S')} Job {SLURM_JOB_ID} started ...")
+    model = model_path
+    if "fp8" in model_path.lower():
+        fp8 = False
+
+    command_sglang = f"python3 -m sglang.launch_server --model-path {model} --tp {tp} --port {port} --mem-fraction-static {gpu_memory} --random-seed {seed} --host 0.0.0.0 --log-level {log_level} --trust-remote-code "
+
+    if fp8:
+        command_sglang += "--quantization fp8 "
+
+    # for qwq and qwen 3 model
+    if add_yarn:
+        base_model_len = 32768
+        if max_model_length < base_model_len:
+            command_sglang += "--context-length {max_model_length} "
+        elif max_model_length < 2* base_model_len:
+            command_sglang += '--json-model-override-args '+ '{"rope_scaling":{"rope_type":"yarn","factor":2.0,"original_max_position_embeddings":32768}}'+' --context-length 65536 '
+        elif max_model_length < 4* base_model_len:
+            command_sglang += '--json-model-override-args '+'{"rope_scaling":{"rope_type":"yarn","factor":4.0,"original_max_position_embeddings":32768}}'+' --context-length 131072 '
+    else:
+        command_sglang += f"--context-length {max_model_length} "
+
+    command_sglang += f"--dist-init-addr {head_node_ip}:{port_multinode} --nnodes {n_nodes} "
+    if ep_moe:
+        command_sglang += "--enable-ep-moe "
+    
+    head_bash_command = f"""echo "BEGIN_IP on Head Node:" && hostname -I && echo "END_IP on Head Node" && \
+{command_sglang} --node-rank 0"""
+
+    print(f"Head Node command: {head_bash_command}")
+    head_process = subprocess.Popen([
+        'srun', '--nodes=1', '--ntasks=1', '-w', head_node, 
+        'bash', '-c', head_bash_command
+    ], env=head_env)
+
+    HEAD_PID = head_process.pid
+
+    # --- Give Head Node Time to Initialize ---
+    print("Waiting for head node to initialize...")
+    time.sleep(10)  # Adjust this time if necessary
+
+    # --- Launch Worker Nodes ---
+    
+    worker_processes = []
+
+    # Loop starts from 1 because 0 is the head node
+    for i in range(1, worker_num):
+        node_i = nodes[i]
+        print(f"STARTING WORKER {i} (Rank {i}) at {node_i}")
+        
+        worker_env = os.environ.copy()
+        worker_env['OUTLINES_CACHE_DIR'] = f"/tmp/{SLURM_JOB_ID}_{i}"
+
+        worker_bash_command = f"{command_sglang} --node-rank {i}"
+
+        print(f"Worker {i} command: {worker_bash_command}")
+        worker_process = subprocess.Popen([
+            'srun', '--nodes=1', '--ntasks=1', '-w', node_i,
+            'bash', '-c', worker_bash_command
+        ], env=worker_env)
+        
+        worker_processes.append(worker_process)
+
+    # Optional: Wait for all processes to complete or handle them as needed
+    # For example, to wait for all processes:
+    # head_process.wait()
+    # for worker_process in worker_processes:
+    #     worker_process.wait()
+
+    # Or to keep the main script running while background processes execute:
+    print("All processes launched. Main script continuing...")
+
+
+
+    
+    # command = f"python -m sglang.launch_server --model-path {model_path} --tp {gpu} --port {port} --mem-fraction-static {gpu_memory} --random-seed {seed} --host 0.0.0.0 --log-level {log_level} --trust-remote-code "
+    
+    # if fp8:
+    #     command += "--quantization fp8 "
+
+    # # for qwq and qwen 3 model
+    # if add_yarn:
+    #     base_model_len = 32768
+    #     if max_model_length < base_model_len:
+    #         command += "--context-length {max_model_length} "
+    #     elif max_model_length < 2* base_model_len:
+    #         command += '--json-model-override-args '+ '{"rope_scaling":{"rope_type":"yarn","factor":2.0,"original_max_position_embeddings":32768}}'+' --context-length 65536 '
+    #     elif max_model_length < 4* base_model_len:
+    #         command += '--json-model-override-args '+'{"rope_scaling":{"rope_type":"yarn","factor":4.0,"original_max_position_embeddings":32768}}'+' --context-length 131072 '
+    # else:
+    #     command += f"--context-length {max_model_length} "
+            
+    # server_process = execute_shell_command(
+    #     command
+    # )
+    # print(command)
+    # stuff to add later
+    # --uvicorn-log-level {debug,info,warning,error,critical,trace}
+    # --reasoning-parser
+    # --enable-reasoning
+    return head_process
 
 def check_server_run(model_path, port, server_process,vllm=False):
     """Check if the server is running and serving the correct model.
@@ -106,11 +242,11 @@ def check_server_run(model_path, port, server_process,vllm=False):
     return True
 
 class LLMClient:
-    def __init__(self, model: str, cfg_generation: dict, base_url: str,
-                  api_key: str, online: bool = False, gpu=1,
+    def __init__(self, model: str, cfg_generation: dict, base_url: str ="",
+                  api_key: str="None", online: bool = False, gpu=1,
                     max_model_length=20000, azure=False,
                     local_server=False, seed=0, fp8=False, gpu_memory=0.9,
-                    sglang= False, log_level="info",enable_thinking=False):
+                    sglang= False, log_level="info",enable_thinking=True, ep_moe = False):
         self.model_path = model
         self.cfg_generation = cfg_generation
         self.base_url = base_url
@@ -122,15 +258,24 @@ class LLMClient:
         self.azure = azure
         self.local_server = local_server
         # should add vllm or sglang option
-        self.qwen3 = "qwen3" in model.lower() 
+        model_lower = model.lower()
+
+        # qwen3 for specific stuff link to qwen3 (yarn, hybrid thinking, etc.) 
+        self.qwen3 = "qwen3" in model_lower 
         self.seed = seed
         self.fp8 = fp8
+        if "fp8" in model_lower:
+            self.fp8 = False
         self.gpu_memory = gpu_memory
         self.sglang = sglang
         self.log_level = log_level # default log level for sglang
         self.enable_thinking = enable_thinking 
+        self.ep_moe = ep_moe
+        if self.qwen3: 
+            if "coder" in model_lower  or "instruct" in model_lower or "thinking" in model_lower:
+                self.qwen3 = False
 
-        if self.qwen3:
+        if not enable_thinking: # as default, enable_thinking is True
             if not "extra_body" in self.cfg_generation:
                 self.cfg_generation["extra_body"] = {}
             
@@ -147,12 +292,23 @@ class LLMClient:
             # stuff for slurm protection in case of multiple jobs
             port = np.random.randint(30000,30100)
             # TODO: vllm/ SGLang
+            n_nodes = int(os.environ.get('SLURM_NNODES', 1))
             if self.sglang:
-                server_process = launch_sglang_serv(model_path=self.model_path, gpu= self.gpu,
-                                                max_model_length=self.max_model_length, port= port,
-                                                fp8 = self.fp8, gpu_memory=self.gpu_memory, 
-                                                seed = self.seed, log_level = self.log_level,
-                                                add_yarn=self.qwen3 or "qwq" in self.model_path.lower())
+                if n_nodes > 1:
+                    port_multinode = np.random.randint(5000,7000)
+                    server_process = launch_sglang_serv_multi_node(model_path=self.model_path, gpu= self.gpu,
+                                                    max_model_length=self.max_model_length, port= port,port_multinode= port_multinode,
+                                                    fp8 = self.fp8, gpu_memory=self.gpu_memory, 
+                                                    seed = self.seed, log_level = self.log_level,
+                                                    add_yarn=self.qwen3 or "qwq" in self.model_path.lower(),
+                                                    ep_moe=self.ep_moe)
+                else:
+                    server_process = launch_sglang_serv(model_path=self.model_path, gpu= self.gpu,
+                                                    max_model_length=self.max_model_length, port= port,
+                                                    fp8 = self.fp8, gpu_memory=self.gpu_memory, 
+                                                    seed = self.seed, log_level = self.log_level,
+                                                    add_yarn=self.qwen3 or "qwq" in self.model_path.lower())
+                
             else:
                 server_process = launch_vllm_serv(model_path=self.model_path, gpu= self.gpu,
                                                 max_model_length=self.max_model_length, port= port,
@@ -160,7 +316,17 @@ class LLMClient:
                                                 seed = self.seed, log_level = self.log_level,
                                                 add_yarn = self.qwen3 or "qwq" in self.model_path.lower())
             print("check server run 0")
-            is_running = check_server_run(self.model_path,port,server_process,vllm=not self.sglang)
+            if n_nodes > 1:
+                n_tries = 4
+            else:
+                n_tries = 1
+            for i_try in range(n_tries):
+                is_running = check_server_run(self.model_path,port,server_process,vllm=not self.sglang)
+                if is_running:
+                    break
+
+            
+
             if not is_running:
                 for i_try in range(1,3):
                     port += 1
@@ -177,6 +343,8 @@ class LLMClient:
                     is_good = check_server_run(self.model_path,port,server_process,vllm=not self.sglang)
                     if is_good:
                         break
+            else:
+                print(' /!\ Server is running /!\ ')
             self.base_url=f"http://localhost:{port}/v1" 
             self.api_key="None"
             is_good = check_server_run(self.model_path,port,server_process,vllm=not self.sglang)
@@ -260,14 +428,14 @@ class LLMClient:
         model = self.model_path.lower()
         if "magistral" in model:
             sys_prompt = magistral_sys_prompt
-        elif "llama-3_3-nemotron-super-49b-v1" in model:
+        elif "llama-3_3-nemotron-super" in model:
             sys_prompt =  f"detailed thinking {self.enable_thinking}"
         else:
             return batch_prompt
         patched_batch = []
         for message in batch_prompt:
             # Find the user message content
-            patched_message = [{"role": "system", "content": magistral_sys_prompt}] + message
+            patched_message = [{"role": "system", "content": sys_prompt}] + message
             patched_batch.append(patched_message)
         return patched_batch
 
@@ -327,8 +495,8 @@ def get_completion_offline(llm,batch_prompt,cfg_generation,n=1,temperature=None,
                     allowed_token_ids=alowed_tokens
                     )
                 flag_judge=True
-    if qwen3:
-        batch_prompt_formated = tokenizer.apply_chat_template(batch_prompt,tokenize=False,add_generation_prompt=True,enable_thinking=False)
+    if qwen3: # enable_thinking always true 
+        batch_prompt_formated = tokenizer.apply_chat_template(batch_prompt,tokenize=False,add_generation_prompt=True,enable_thinking=True)
     else:
         batch_prompt_formated = tokenizer.apply_chat_template(batch_prompt,tokenize=False,add_generation_prompt=True)
     outs = llm.generate(batch_prompt_formated,sampling_params)
@@ -593,34 +761,51 @@ Problem:"""
 
 
 if __name__ == "__main__":
-    llm_url = "http://localhost:8000/v1"
-    llm_model = "meta-llama/Llama-3.2-3B-Instruct"
+    # test multi nodes
+    model = "/lustre/fsn1/projects/rech/imi/uqv82bm/hf/GLM-4.5-Air-FP8"#Qwen2.5-14B-Instruct" #DeepSeek-R1-0528"
+    cfg_generation = {"model": model, "temperature": 0.6}
+    online=True
+    gpu=4
+    local_server = True
+    fp8=False
+    sglang = True
+    ep_moe = True
+    llm = LLMClient(model=model, cfg_generation=cfg_generation, online=online, gpu=gpu, local_server=local_server, fp8=fp8, sglang=sglang, ep_moe=ep_moe)
+    test_messages = [
+        {"role": "system", "content": "You are a good assistant"},
+        {"role": "user", "content": "Is it chocolatine or pain au chocolat?"},
+    ]
     
-    client = OpenAI(base_url=llm_url, api_key="token-abc123")
-    cfg_generation ={"model": llm_model, "temperature": 1, "logprobs": True}
-
-    system_prompt = "You are a good barman"
-    user_prompt = "Yo get me a beer"
-
-    messages = [
-         {"role": "system", "content": system_prompt}, 
-         {"role": "user", "content": user_prompt}
-    ]
-
-    out = get_multiple_completions(client, [messages], cfg_generation)
-
+    out = llm.multiple_completion([test_messages], n=1)
     print(out[0].response)
-    print(out[0].logprobs)
+    # llm_url = "http://localhost:8000/v1"
+    # llm_model = "meta-llama/Llama-3.2-3B-Instruct"
+    
+    # client = OpenAI(base_url=llm_url, api_key="token-abc123")
+    # cfg_generation ={"model": llm_model, "temperature": 1, "logprobs": True}
 
-    messages = [
+    # system_prompt = "You are a good barman"
+    # user_prompt = "Yo get me a beer"
 
-        {
-            "role": "user", 
-            "content":  "You need to choose randomly between 'B' and 'A'"
-        },
-    ]
-    guided_choice=["A","B"]
+    # messages = [
+    #      {"role": "system", "content": system_prompt}, 
+    #      {"role": "user", "content": user_prompt}
+    # ]
 
-    out = get_multiple_completions_judge(guided_choice, client, [messages], cfg_generation)
-    print(out[0].response)
-    print(out[0].logprobs)
+    # out = get_multiple_completions(client, [messages], cfg_generation)
+
+    # print(out[0].response)
+    # print(out[0].logprobs)
+
+    # messages = [
+
+    #     {
+    #         "role": "user", 
+    #         "content":  "You need to choose randomly between 'B' and 'A'"
+    #     },
+    # ]
+    # guided_choice=["A","B"]
+
+    # out = get_multiple_completions_judge(guided_choice, client, [messages], cfg_generation)
+    # print(out[0].response)
+    # print(out[0].logprobs)

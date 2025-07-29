@@ -15,7 +15,7 @@ parser.add_argument("--gpu_memory", type=float, default=0.9, help="GPU memory us
 parser.add_argument("--only_print", action=argparse.BooleanOptionalAction, default=False)
 parser.add_argument("--long", action=argparse.BooleanOptionalAction, default=False)
 parser.add_argument("--local_server", action=argparse.BooleanOptionalAction, default=True, help="Use local server for LLM")
-parser.add_argument("--sglang", action=argparse.BooleanOptionalAction, help="use sglang")
+parser.add_argument("--sglang", action=argparse.BooleanOptionalAction, default=True, help="use sglang")
 parser.add_argument("--save_every_n_generations", type=int, default=5)
 parser.add_argument("--n_problem_to_gen", type=int, default=5, help ="Number of problem to generate for each prompt (batch_size * n_problem_to_gen = number of generated puzzles)")
 parser.add_argument("--batch_size", type=int, default=32, help="Number of query to send to the LLM to create new puzzles (multiple this number by n_problem_to_gen to get the number of generated puzzles as n_problem_to_gen puzzles are generated per query)")
@@ -32,7 +32,7 @@ parser.add_argument("--fp8", action=argparse.BooleanOptionalAction, help="fp8")
 parser.add_argument("--enable_thinking", action=argparse.BooleanOptionalAction, help="enable thinking mode for qwen3 models")
 parser.add_argument("--max_model_length", type=int, default=-1, help="Max model length (context size) for the LLM, default is 8192")
 parser.add_argument("--max_tokens", type=int, default=-1, help="Max generated tokens for the LLM, default is 8192")
-
+parser.add_argument("--ep_moe", action=argparse.BooleanOptionalAction, help="Enable EP for MoE models")
 args = parser.parse_args()
 
 if args.long:
@@ -124,13 +124,15 @@ for model in list_model:
         extra += " --fp8"
     else:
         extra += " --no-fp8"
+    if args.ep_moe:
+        extra += " --ep_moe"
     model_id = model
     if "/" in model_id:
         model_id = model_id.split("/")[-1]
     job_name = f"ACES_P3_model-{model_id}" + "_nsolution-"+str(args.num_solutions)
 
     slurmfile_path = f'run_{job_name}.slurm'
-    env_name = "aces_sglang" if args.sglang else "aces"
+    env_name = "aces_sglang49p5" if args.sglang else "aces"
     name_experience= model_id+"_"+args.name_experience +"_nsolution-"+str(args.num_solutions)+ "_seed_"+str(args.seed)
     script = script_template.format(qos=qos,h=h,gpu=args.gpu,cpu=cpu,path_archive=args.path_archive, path_save=args.path_save, name_experience=name_experience, n_generation=args.n_generation, num_solutions=args.num_solutions, seed=args.seed, model_name_or_path=model, extra=extra, job_name=job_name,env_name=env_name,export_stuff=export_stuff,module_load=module_load)
     if args.only_print:
