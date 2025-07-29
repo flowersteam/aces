@@ -50,8 +50,8 @@ script_template="""#!/bin/bash
 #SBATCH --account=imi@h100
 #SBATCH -C h100
 #SBATCH --job-name={job_name}
-#SBATCH --nodes=1
-#SBATCH --ntasks-per-node={nodes}
+#SBATCH --nodes={nodes}
+#SBATCH --ntasks-per-node=1
 #SBATCH --gres=gpu:{gpu}
 #SBATCH --cpus-per-task={cpu}
 {qos}
@@ -85,7 +85,7 @@ if args.sglang:
 export_stuff=""
 if args.log_level:
     export_stuff += f"export VLLM_LOGGING_LEVEL=ERROR"
-cpu=max(24*args.gpu,96)
+cpu=min(24*args.gpu,96)
 # for id_part in [1, 2, 3]:
 base_path_model="/lustre/fsn1/projects/rech/imi/uqv82bm/hf/"
 
