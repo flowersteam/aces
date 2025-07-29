@@ -27,17 +27,20 @@ benchmarks on average across 11 state-of-the-art code LLMs.
 ## Installation steps
 1. (Recommended) Create a new conda environment.
 ```
-conda create -n aces_sglang python=3.11 -y
-conda activate aces_sglang
+conda create -n aces_sglang49p5 python=3.11 -y
+conda activate aces_sglang49p5
 ```
+<!-- conda create -n aces_sglang49p5 python=3.11 -y -->
+
 2. Install vLLM (see [vllm installation for latest info](https://docs.vllm.ai/en/latest/getting_started/installation.html))
 ```
 pip install vllm 
 ```
 Or SGLang
 ```
-pip install "sglang[all]>=0.4.8.post1"
+pip install sglang[all]==0.4.9.post5
 ```
+
 3. install ACES
 ```
 git clone https://github.com/flowersteam/aces.git; cd aces; pip install -e .; pip install -r requirements.txt
