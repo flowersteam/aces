@@ -131,7 +131,7 @@ for model in list_model:
     model_id = model
     if "/" in model_id:
         model_id = model_id.split("/")[-1]
-    job_name = f"ACES_P3_model-{model_id}" + "_nsolution-"+str(args.num_solutions)
+    job_name = f"ACES_P3_model-{model_id}"+"_"+args.name_experience + "_nsolution-"+str(args.num_solutions)
 
     slurmfile_path = f'run_{job_name}.slurm'
     env_name = "aces_sglang49p5" if args.sglang else "aces"
