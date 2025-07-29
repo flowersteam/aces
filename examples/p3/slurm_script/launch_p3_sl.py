@@ -98,7 +98,7 @@ for model in list_model:
     if args.path_checkpoint_archive!="":
         extra += f' --path_checkpoint_archive {args.path_checkpoint_archive}'
     if args.gpu:
-        extra += f" --gpu {args.gpu}"
+        extra += f" --gpu {args.gpu*args.nodes}"
     extra += f" --gpu_memory {args.gpu_memory}"
     if args.local_server:
         extra += " --local_server"
@@ -136,7 +136,7 @@ for model in list_model:
     slurmfile_path = f'run_{job_name}.slurm'
     env_name = "aces_sglang49p5" if args.sglang else "aces"
     name_experience= model_id+"_"+args.name_experience +"_nsolution-"+str(args.num_solutions)+ "_seed_"+str(args.seed)
-    script = script_template.format(qos=qos,h=h,gpu=args.gpu*args.nodes,nodes=args.nodes,cpu=cpu,path_archive=args.path_archive, path_save=args.path_save, name_experience=name_experience, n_generation=args.n_generation, num_solutions=args.num_solutions, seed=args.seed, model_name_or_path=model, extra=extra, job_name=job_name,env_name=env_name,export_stuff=export_stuff,module_load=module_load)
+    script = script_template.format(qos=qos,h=h,gpu=args.gpu,nodes=args.nodes,cpu=cpu,path_archive=args.path_archive, path_save=args.path_save, name_experience=name_experience, n_generation=args.n_generation, num_solutions=args.num_solutions, seed=args.seed, model_name_or_path=model, extra=extra, job_name=job_name,env_name=env_name,export_stuff=export_stuff,module_load=module_load)
     if args.only_print:
         print(script)
         exit()
