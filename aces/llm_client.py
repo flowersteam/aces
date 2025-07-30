@@ -430,6 +430,10 @@ class LLMClient:
             sys_prompt = magistral_sys_prompt
         elif "llama-3_3-nemotron-super" in model:
             sys_prompt =  f"detailed thinking {self.enable_thinking}"
+            if self.enable_thinking:
+                sys_prompt =  f""
+            else:
+                sys_prompt =  f"/no_think"
         else:
             return batch_prompt
         patched_batch = []
