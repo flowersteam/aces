@@ -88,11 +88,10 @@ class ACES_base:
         print("LLM client initialized")
 
 
-    def exctract_reasoning_response(self, response: str) -> str:
+    def exctract_reasoning_response(self, response: str, think_stop_tag: str= "</think>") -> str:
         """Extract reasoning from the response"""
         reasoning = None
         sol = response
-        think_stop_tag = "</think>"
         if think_stop_tag in response:
             reasoning = response.split(think_stop_tag)[0].strip() + think_stop_tag
             sol = response.split(think_stop_tag)[1].strip()

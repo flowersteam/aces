@@ -262,6 +262,15 @@ class LLMClient:
 
         # qwen3 for specific stuff link to qwen3 (yarn, hybrid thinking, etc.) 
         self.qwen3 = "qwen3" in model_lower 
+        self.think_stop_tag = "</think>"
+
+        self.openai_model = "gpt-oss" in model_lower
+        if self.openai_model:
+            if not "extra_body" in self.cfg_generation:
+                self.cfg_generation["extra_body"] = {}
+            self.cfg_generation["extra_body"].update({"skip_special_tokens": False})
+            self.think_stop_tag = "<|end|><|start|>assistant<|channel|>final<|message|>"
+        
         self.seed = seed
         self.fp8 = fp8
         if "fp8" in model_lower:
@@ -434,6 +443,8 @@ class LLMClient:
                 sys_prompt =  f""
             else:
                 sys_prompt =  f"/no_think"
+        elif "gpt-oss" in model:
+            sys_prompt = "Reasoning: high"
         else:
             return batch_prompt
         patched_batch = []

@@ -113,7 +113,7 @@ class ACES_p3(ACES_base):
             n_solutions = []
             for sol in list_solutions[id_puzzle].response:
                 # process solution
-                reasoning, sol = self.exctract_reasoning_response(sol)
+                reasoning, sol = self.exctract_reasoning_response(sol,think_stop_tag=self.llm.think_stop_tag)
                 reasoning_n_solutions.append(reasoning)
                 n_solutions.append(self.process_solutions(solution=sol, problem=problem))
             puzzles[id_puzzle].all_solution = n_solutions
@@ -199,7 +199,7 @@ class ACES_p3(ACES_base):
         list_skills = self.llm.multiple_completion(list_prompt_chat,temperature = self.llm_args.temperature_labeller)
         assert len(list_skills) == len(puzzles)
         for i in range(len(puzzles)):
-            reasoning, sol = self.exctract_reasoning_response(list_skills[0].response[0])
+            reasoning, sol = self.exctract_reasoning_response(list_skills[i].response[0],think_stop_tag=self.llm.think_stop_tag)
             skill, explanation_skill = extract_skill(sol,n_skills=len(self.skill_list))
             puzzles[i].emb = skill
             if reasoning is not None:
@@ -217,7 +217,7 @@ class ACES_p3(ACES_base):
             list_prompt.append(get_prompt_description_p3(p.program_str))
         list_description = self.llm.multiple_completion(self.formating_chat_prompt(list_prompt))
         for i in range(len(puzzles)):
-            reasoning, description = self.exctract_reasoning_response(list_description[i].response[0])
+            reasoning, description = self.exctract_reasoning_response(list_description[i].response[0],think_stop_tag=self.llm.think_stop_tag)
             puzzles[i].description = description
         return puzzles
 
@@ -243,7 +243,7 @@ class ACES_p3(ACES_base):
         list_new_p3 = []
         
         for id_puzzle,puzzle in enumerate(news_puzzles):
-            reasoning, puzzle = self.exctract_reasoning_response(puzzle)
+            reasoning, puzzle = self.exctract_reasoning_response(puzzle,think_stop_tag=self.llm.think_stop_tag)
             split_puzzles = puzzle.replace("```python","```").replace("``` python","```").split("```")
             for idx in range(len(split_puzzles)):
                 if "def f" in split_puzzles[idx] and "def g" in split_puzzles[idx]:
