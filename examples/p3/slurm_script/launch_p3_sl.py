@@ -33,6 +33,7 @@ parser.add_argument("--enable_thinking", action=argparse.BooleanOptionalAction, 
 parser.add_argument("--max_model_length", type=int, default=-1, help="Max model length (context size) for the LLM, default is 8192")
 parser.add_argument("--max_tokens", type=int, default=-1, help="Max generated tokens for the LLM, default is 8192")
 parser.add_argument("--ep_moe", action=argparse.BooleanOptionalAction, help="Enable EP for MoE models")
+parser.add_argument("--env_name", type=str, default="aces_sglang49p5", help="Environment name for conda activation, default is 'aces_sglang49p5' for sglang or 'aces' for non-sglang")
 # nodes
 parser.add_argument("--nodes", type=int, default=1, help="Number of nodes to use for the job")
 args = parser.parse_args()
@@ -60,7 +61,7 @@ script_template="""#!/bin/bash
 #SBATCH --output=./out/{job_name}-%A.out
 #SBATCH --error=./out/{job_name}-%A.out
 # set -x
-
+export TORCH_CUDA_ARCH_LIST="9.0"
 export TMPDIR=$JOBSCRATCH
 module purge
 module load arch/h100
@@ -134,7 +135,7 @@ for model in list_model:
     job_name = f"ACES_P3_model-{model_id}"+"_"+args.name_experience + "_nsolution-"+str(args.num_solutions)
 
     slurmfile_path = f'run_{job_name}.slurm'
-    env_name = "aces_sglang49p5" if args.sglang else "aces"
+    env_name = args.env_name #"aces_sglang49p5" if args.sglang else "aces"
     name_experience= model_id+"_"+args.name_experience +"_nsolution-"+str(args.num_solutions)+ "_seed_"+str(args.seed)
     script = script_template.format(qos=qos,h=h,gpu=args.gpu,nodes=args.nodes,cpu=cpu,path_archive=args.path_archive, path_save=args.path_save, name_experience=name_experience, n_generation=args.n_generation, num_solutions=args.num_solutions, seed=args.seed, model_name_or_path=model, extra=extra, job_name=job_name,env_name=env_name,export_stuff=export_stuff,module_load=module_load)
     if args.only_print:
