@@ -45,18 +45,18 @@ if os.path.exists(path_save):
 
 # label puzzles that are not labeled yet check archive[i].emb_bis
 # puzzles = select puzzles that are not labeled yet from aces.archive
-puzzles = []
-puzzles_id = []
-for i, puzzle in enumerate(aces.archive):
-    if puzzle.emb_bis is None:
-        puzzles.append(puzzle)
-        puzzles_id.append(i)
+# puzzles = []
+# puzzles_id = []
+# for i, puzzle in enumerate(aces.archive):
+#     if puzzle.emb_bis is None:
+#         puzzles.append(puzzle)
+#         puzzles_id.append(i)
 
-puzzles_label = aces.generate_semantic_descriptors(puzzles)
+puzzles_label = aces.generate_semantic_descriptors(aces.archive)
 
 # put back puzzles in list aces.archive
-for i, puzzle in enumerate(puzzles):
-    aces.archive[puzzles_id[i]].emb_bis = puzzles_label[i]
+# for i, puzzle in enumerate(puzzles):
+#     aces.archive[puzzles_id[i]].emb_bis = puzzles_label[i]
 
 # save archive
 with open(path_save, 'wb') as f:
