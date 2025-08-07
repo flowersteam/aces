@@ -37,7 +37,7 @@ aces = ACES_p3(aces_args, llm_args)
 
 # check if path_save_relabel_archive exists if yes load it in aces.archive
 import os
-path_save = aces_args.label_args.path_checkpoint_archive
+path_save = aces_args.path_checkpoint_archive
 if os.path.exists(path_save):
     print(f"Loading archive from {path_save}")
     with open(path_save, 'rb') as f:
