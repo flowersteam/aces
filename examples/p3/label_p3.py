@@ -60,6 +60,6 @@ puzzles_label = aces.generate_semantic_descriptors(aces.archive)
 
 # save archive
 with open(path_save, 'wb') as f:
-    pickle.dump(aces.archive, f)
+    pickle.dump(puzzles_label, f)
 
-print(f"Saved archive with {len(aces.archive)} puzzles to {path_save}")
+print(f"Saved archive with {len(puzzles_label)} puzzles to {path_save}")
