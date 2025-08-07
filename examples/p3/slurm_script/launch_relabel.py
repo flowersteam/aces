@@ -1,0 +1,87 @@
+import os
+import subprocess
+import argparse
+parser = argparse.ArgumentParser()  
+parser.add_argument("--path_archive", type=str, default="", help="Path to the archive file. If not provided, a new archive will be created.")
+parser.add_argument("--model_name_or_path", type=str, default="gpt-4.1", help="Model name or path to the LLM.")
+parser.add_argument("--path_save", type=str, default="/home/flowers/work/aces/save_data/gen-gpt41_testby-qwen3-1b.pkl", help="Path to save the archive.")
+parser.add_argument("--azure",  action=argparse.BooleanOptionalAction, help="activate azure or not.")
+
+
+
+args = parser.parse_args()
+
+if args.long:
+    qos = "#SBATCH --qos=qos_gpu_h100-t4"
+    h = 64
+else:
+    qos= ""
+    h=20
+script_template="""#!/bin/bash
+#SBATCH --account=imi@h100
+#SBATCH -C h100
+#SBATCH --job-name={job_name}
+#SBATCH --nodes=1
+#SBATCH --ntasks-per-node=1
+#SBATCH --gres=gpu:{gpu}
+#SBATCH --cpus-per-task={cpu}
+{qos}
+#SBATCH --hint=nomultithread
+#SBATCH --time={h}:00:00
+#SBATCH --output=./out/{job_name}-%A.out
+#SBATCH --error=./out/{job_name}-%A.out
+# set -x
+
+export TMPDIR=$JOBSCRATCH
+module purge
+module load arch/h100
+module load python/3.11.5
+ulimit -c 0
+limit coredumpsize 0
+export CORE_PATTERN=/dev/null
+
+
+
+conda activate aces
+cd /lustre/fswork/projects/rech/imi/uqv82bm/aces/examples/p3/
+
+python label_p3.py --path_archive {path_archive} --path_save {path_save} --name_experience {name_experience} --n_generation {n_generation} --num_solutions {num_solutions} --seed {seed} --model_name_or_path {model_name_or_path} {extra}
+"""
+# export CUDA_VISIBLE_DEVICES={gpu}
+# export WORLD_SIZE=1
+
+
+cpu=max(24*args.gpu,96)
+# for id_part in [1, 2, 3]:
+base_path_model="/lustre/fsn1/projects/rech/imi/uqv82bm/hf/"
+
+if args.model_name_or_path =="model_sweep":
+    list_model = [base_path_model+"mistral-large-instruct-2407-awq", base_path_model + "Qwen2.5-Coder-32B-Instruct"]
+else:
+    list_model = [args.model_name_or_path]
+for model in list_model:
+    extra = ""
+    if args.path_checkpoint_archive!="":
+        extra += f' --path_checkpoint_archive {args.path_checkpoint_archive}'
+    if args.gpu:
+        extra += f" --gpu {args.gpu}"
+    extra+= f" --save_every_n_generations {args.save_every_n_generations}"    
+    model_id = model
+    if "/" in model_id:
+        model_id = model_id.split("/")[-1]
+    job_name = f"ACES_P3_relabel_model-{model_id}" + "_nsolution-"+str(args.num_solutions)
+
+    slurmfile_path = f'run_{job_name}.slurm'
+    name_experience= model_id+"_"+args.name_experience +"_nsolution-"+str(args.num_solutions)+ "_seed_"+str(args.seed)
+    script = script_template.format(qos=qos,h=h,gpu=args.gpu,cpu=cpu,path_archive=args.path_archive, path_save=args.path_save, name_experience=name_experience, n_generation=args.n_generation, num_solutions=args.num_solutions, seed=args.seed, model_name_or_path=model, extra=extra, job_name=job_name)
+    if args.only_print:
+        print(script)
+        exit()
+    with open(slurmfile_path, 'w') as f:
+        f.write(script)
+    subprocess.call(f'sbatch {slurmfile_path}', shell=True)
+    # can you rm slurm/run_{job_name}.slurm
+    os.remove(slurmfile_path)
+    
+        
+        
