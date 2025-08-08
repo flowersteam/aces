@@ -55,7 +55,7 @@ def launch_sglang_serv(model_path: str, gpu: int = 1, max_model_length=20000, po
     if add_yarn:
         base_model_len = 32768
         if max_model_length < base_model_len:
-            command += "--context-length {max_model_length} "
+            command += f"--context-length {max_model_length} "
         elif max_model_length < 2* base_model_len:
             command += '--json-model-override-args '+ '{"rope_scaling":{"rope_type":"yarn","factor":2.0,"original_max_position_embeddings":32768}}'+' --context-length 65536 '
         elif max_model_length < 4* base_model_len:
@@ -119,7 +119,7 @@ def launch_sglang_serv_multi_node(model_path: str, gpu: int = 1, max_model_lengt
     if add_yarn:
         base_model_len = 32768
         if max_model_length < base_model_len:
-            command_sglang += "--context-length {max_model_length} "
+            command_sglang += f"--context-length {max_model_length} "
         elif max_model_length < 2* base_model_len:
             command_sglang += '--json-model-override-args '+ '{"rope_scaling":{"rope_type":"yarn","factor":2.0,"original_max_position_embeddings":32768}}'+' --context-length 65536 '
         elif max_model_length < 4* base_model_len:
