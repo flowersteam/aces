@@ -64,7 +64,7 @@ batches = [
     for i in range(0, len(archive_to_solve), batch_size)
 ]
 
-for batch_idx, batch in enumerate(tqdm(batches, desc="Batches", start=1), start=1):
+for batch_idx, batch in enumerate(tqdm(batches, desc="Batches"), start=1):
     print(f"Batch {batch_idx}/{len(batches)}: Generating multiple solutions for {len(batch)} puzzles …")
     list_codes = aces.generate_multiple_solutions(batch)
     print("Evaluating solutions …")
