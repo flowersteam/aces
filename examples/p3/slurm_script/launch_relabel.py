@@ -21,6 +21,7 @@ parser.add_argument("--n_problem_to_gen", type=int, default=5, help ="Number of 
 parser.add_argument("--batch_size", type=int, default=32, help="Number of query to send to the LLM to create new puzzles (multiple this number by n_problem_to_gen to get the number of generated puzzles as n_problem_to_gen puzzles are generated per query)")
 parser.add_argument("--dev", action=argparse.BooleanOptionalAction, help="Development mode")
 parser.add_argument("--log_level", type=str, default="info", help="Log level for sglang/vllm server")
+parser.add_argument("--kwargs_engine", type=str, default="", help="Additional kwargs for engine, e.g. --kwargs-engine='--enable-reasoning '")
 
 # sampling parameters
 parser.add_argument("--temperature_labeller", type=float, default=0.0, help="Temperature for sampling labeller")
@@ -129,6 +130,8 @@ for model in list_model:
         extra += " --no-fp8"
     if args.ep_moe:
         extra += " --ep_moe"
+
+    extra += f" --kwargs_engine '{args.kwargs_engine}'"
     model_id = model
     if "/" in model_id:
         model_id = model_id.split("/")[-1]

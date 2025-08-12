@@ -192,3 +192,9 @@ class LLMArguments:
             "help": "enable EP for MoE"
         },
     )
+    kwargs_engine: str = field(
+        default="",
+        metadata={
+            "help": "additional kwargs for engine, e.g. --kwargs-engine='--enable-reasoning '"
+        },
+    )
