@@ -40,10 +40,10 @@ else:
 
     # set those key to None: all_solution all_solution_reasoning fitness all_solution_correct 
     for puzzle in archive:
-        puzzle["all_solution"] = None
-        puzzle["all_solution_reasoning"] = None
-        puzzle["fitness"] = None
-        puzzle["all_solution_correct"] = None
+        puzzle.all_solution = None
+        puzzle.all_solution_reasoning = None
+        puzzle.fitness = None
+        puzzle.all_solution_correct = None
 
 
 # gather puzzles that still need evaluation
@@ -71,13 +71,13 @@ for batch_idx, batch in enumerate(tqdm(batches, desc="Batches", start=1), start=
     evaluated = aces.evaluate_python_code(list_codes)
 
     # update each puzzle's bench_results entry
-    for result in evaluated:
-        puzzle = result.puzzle
+    for puzzle in evaluated:
         entry = puzzle.bench_results[model_name]
-        entry["all_solution"] = result.solutions
-        entry["all_solution_reasoning"] = getattr(result, "reasonings", [])
-        entry["fitness"] = result.fitness
-        entry["all_solution_correct"] = result.correct
+        entry["all_solution"] = puzzle.all_solution
+        entry["all_solution_reasoning"] = getattr(puzzle, "all_solution_reasoning", [])
+        entry["fitness"] = puzzle.fitness
+        entry["all_solution_correct"] = puzzle.all_solution_correct
+        
 
     # report remaining puzzles
     remaining = len(
