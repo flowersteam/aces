@@ -116,8 +116,10 @@ class ACES_p3(ACES_base):
                 reasoning, sol = self.exctract_reasoning_response(sol,think_stop_tag=self.llm.think_stop_tag)
                 reasoning_n_solutions.append(reasoning)
                 n_solutions.append(self.process_solutions(solution=sol, problem=problem))
+            
             puzzles[id_puzzle].all_solution = n_solutions
             puzzles[id_puzzle].all_solution_reasoning = reasoning_n_solutions
+            puzzles[id_puzzle].full_solution_response = list_solutions[id_puzzle].response
         # don't forget to verify solution with python
         return puzzles
     

@@ -126,13 +126,13 @@ class LLMArguments:
         },
     )
     max_tokens: Optional[int] = field(
-        default = 8000,
+        default = -1,
         metadata={
             "help": "max tokens -1 for no limit"
         },
     )
     max_model_length: Optional[int] = field(
-        default = 30000,
+        default = 32000,
         metadata={
             "help": "max context size"
         },

@@ -30,8 +30,9 @@ class P3:
         self.all_solution_correct = all_solution_correct
         self.unique_id = unique_id
         self.phenotype = emb   
-        self.reasoning_problem_generation = None
-        self.all_solution_reasoning = None
+        self.reasoning_problem_generation = reasoning_problem_generation
+        self.all_solution_reasoning = all_solution_reasoning
+        self.full_solution_response = None
 
     def __str__(self) -> str:
         return self.program_str
