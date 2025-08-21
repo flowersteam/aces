@@ -285,11 +285,11 @@ class LLMClient:
             if "coder" in model_lower  or "instruct" in model_lower or "thinking" in model_lower:
                 self.qwen3 = False
 
-        if not enable_thinking: # as default, enable_thinking is True
-            if not "extra_body" in self.cfg_generation:
-                self.cfg_generation["extra_body"] = {}
-            
-            self.cfg_generation["extra_body"].update({"chat_template_kwargs":{"enable_thinking": self.enable_thinking}})
+        # if not enable_thinking: # as default, enable_thinking is True
+        if not "extra_body" in self.cfg_generation:
+            self.cfg_generation["extra_body"] = {}
+        
+        self.cfg_generation["extra_body"].update({"chat_template_kwargs":{"enable_thinking": self.enable_thinking}})
         self.reasoning_parser = ""
         if online:
             self.init_client()

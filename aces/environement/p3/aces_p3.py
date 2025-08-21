@@ -204,10 +204,8 @@ class ACES_p3(ACES_base):
             reasoning, sol = self.exctract_reasoning_response(list_skills[i].response[0],think_stop_tag=self.llm.think_stop_tag)
             skill, explanation_skill = extract_skill(sol,n_skills=len(self.skill_list))
             puzzles[i].emb = skill
-            if reasoning is not None:
-                puzzles[i].explanation_emb = reasoning + sol
-            else:
-                puzzles[i].explanation_emb = sol
+            puzzles[i].explanation_emb = list_skills[i].response[0]
+
             # puzzle[i].phenotype = skill
         return puzzles
     
@@ -239,13 +237,13 @@ class ACES_p3(ACES_base):
             list_prompt.append(prompt)
 
         list_prompt_chat = self.formating_chat_prompt(list_prompt)
-        news_puzzles = self.llm.multiple_completion(list_prompt_chat)
-        news_puzzles = [p.response[0] for p in news_puzzles]
+        new_puzzles = self.llm.multiple_completion(list_prompt_chat)
+        new_puzzles = [p.response[0] for p in new_puzzles]
         #TODO: exctract puzzles + ...
         list_new_p3 = []
-        
-        for id_puzzle,puzzle in enumerate(news_puzzles):
-            reasoning, puzzle = self.exctract_reasoning_response(puzzle,think_stop_tag=self.llm.think_stop_tag)
+
+        for id_puzzle,new_puzzle in enumerate(new_puzzles):
+            reasoning, puzzle = self.exctract_reasoning_response(new_puzzle,think_stop_tag=self.llm.think_stop_tag)
             split_puzzles = puzzle.replace("```python","```").replace("``` python","```").split("```")
             for idx in range(len(split_puzzles)):
                 if "def f" in split_puzzles[idx] and "def g" in split_puzzles[idx]:
@@ -255,7 +253,7 @@ class ACES_p3(ACES_base):
                                 target_skills=list_goal[id_puzzle],
                                 puzzles_id_fewshot=list_few_shot_ex_id[id_puzzle], 
                                 idx_generation=self.idx_generation,
-                                reasoning_problem_generation = reasoning
+                                reasoning_problem_generation = new_puzzle
                                 )
                     list_new_p3.append(new_p3)
         return list_new_p3
