@@ -79,6 +79,7 @@ class ACES_p3(ACES_base):
             
     def update_archive(self,list_p3: list[P3], rm_fitness_condition = False,update_id = True):
         """update archive with valid puzzles"""
+        count_valid = 0
         for p in list_p3:
             condition_add_individual = p.fitness != -np.inf
             if rm_fitness_condition:
@@ -96,8 +97,10 @@ class ACES_p3(ACES_base):
                 if not niche_idx in self.niche_to_idx_archive:
                     self.niche_to_idx_archive[niche_idx] = []
                 self.niche_to_idx_archive[niche_idx].append(p.unique_id)
-                
-    
+                count_valid += 1
+        print(f"update archive with {count_valid} valid puzzles")
+        print(f"example puzzle: {self.archive[0].program_str}")
+
     def generate_multiple_solutions(self, puzzles: list[P3]) -> List[P3]:
         """Use LLM to generate multiple solutions for a list of puzzle"""
         list_prompt_sol = []
@@ -244,9 +247,13 @@ class ACES_p3(ACES_base):
 
         for id_puzzle,new_puzzle in enumerate(new_puzzles):
             reasoning, puzzle = self.exctract_reasoning_response(new_puzzle,think_stop_tag=self.llm.think_stop_tag)
+            if self.llm.enable_thinking:
+                # if reasoning is None, rm puzzle
+                if reasoning == None:
+                    continue
             split_puzzles = puzzle.replace("```python","```").replace("``` python","```").split("```")
             for idx in range(len(split_puzzles)):
-                if "def f" in split_puzzles[idx] and "def g" in split_puzzles[idx]:
+                if "\ndef f" in split_puzzles[idx] and "\ndef g" in split_puzzles[idx]:
                     split_puzzles[idx] = split_puzzles[idx].split("\nassert f(")[0]
                     split_puzzles[idx] = split_puzzles[idx] + "\nassert f(g()) == True\n"
                     new_p3 = P3(split_puzzles[idx],
