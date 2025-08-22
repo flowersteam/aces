@@ -246,10 +246,11 @@ class LLMClient:
                   api_key: str="None", online: bool = False, gpu=1,
                     max_model_length=20000, azure=False,
                     local_server=False, seed=0, fp8=False, gpu_memory=0.9,
-                    sglang= False, log_level="info",enable_thinking=True, ep_moe = False, kwargs_engine=""):
+                    sglang= False, log_level="info",enable_thinking=True, ep_moe = False, kwargs_engine="", llm_args = None):
         
 
         # init cfg generation
+        self.llm_args = llm_args
         cfg_generation = {"model": self.llm_args.model_name_or_path, "temperature": self.llm_args.temperature}
         if self.llm_args.max_tokens!= -1:
             cfg_generation["max_tokens"] = self.llm_args.max_tokens

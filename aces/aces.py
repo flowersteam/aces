@@ -71,7 +71,8 @@ class ACES_base:
                              log_level= self.llm_args.log_level,
                              enable_thinking = self.llm_args.enable_thinking,
                              ep_moe=self.llm_args.ep_moe,
-                             kwargs_engine=self.llm_args.kwargs_engine
+                             kwargs_engine=self.llm_args.kwargs_engine,
+                             llm_args = self.llm_args
                             )
         print("LLM client initialized")
 
