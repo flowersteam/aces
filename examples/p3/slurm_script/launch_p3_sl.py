@@ -35,6 +35,8 @@ parser.add_argument("--max_model_length", type=int, default=-1, help="Max model 
 parser.add_argument("--max_tokens", type=int, default=-1, help="Max generated tokens for the LLM, default is 8192")
 parser.add_argument("--ep_moe", action=argparse.BooleanOptionalAction, help="Enable EP for MoE models")
 parser.add_argument("--env_name", type=str, default="aces_sglang49p5", help="Environment name for conda activation, default is 'aces_sglang49p5' for sglang or 'aces' for non-sglang")
+parser.add_argument("--presence_penalty", type=float, default=1.0, help="Presence penalty for the LLM")
+
 # nodes
 parser.add_argument("--nodes", type=int, default=1, help="Number of nodes to use for the job")
 args = parser.parse_args()
@@ -114,6 +116,7 @@ for model in list_model:
     extra += f" --save_every_n_generations {args.save_every_n_generations}"    
     extra += f" --temperature_labeller {args.temperature_labeller}"
     extra += f" --kwargs_engine '{args.kwargs_engine}'"
+    extra += f" --presence_penalty {args.presence_penalty}"
 
     if args.n_problem_to_gen:
         extra += f" --n_problem_to_gen {args.n_problem_to_gen}"
