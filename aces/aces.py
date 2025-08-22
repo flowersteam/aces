@@ -341,8 +341,12 @@ class ACES_base:
         archive_index = int(archive_index)
         return archive_index
 
+    def get_folder_save(self):
+        folder = self.aces_args.path_save + self.aces_args.name_experience +"_" + str(self.aces_args.seed) + "/"
+        return folder
+
     def save_archive(self):
-        base_path = self.aces_args.path_save + self.aces_args.name_experience +"_" + str(self.aces_args.seed) + "/"
+        base_path = self.get_folder_save()
         if not os.path.exists(base_path):
             os.makedirs(base_path, exist_ok=True)
 

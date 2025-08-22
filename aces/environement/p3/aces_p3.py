@@ -1,4 +1,5 @@
 import random
+import re
 from typing import List, Dict
 from dataclasses import dataclass, field
 import json
@@ -64,8 +65,21 @@ class ACES_p3(ACES_base):
             # rm_fitness_condition = True because initial puzzles should be solvable
             print("update archive with initial puzzles")
             self.update_archive(list_codes, rm_fitness_condition = True)
+
         else:
-            print("resume experiment from the given a archive checkpoint: ", self.aces_args.path_checkpoint_archive)
+            if self.aces_args.path_checkpoint_archive == "last":
+                print("resume experiment from the last checkpoint")
+                base_path = self.get_folder_save()
+                # get all files in base_path folder
+                all_files = os.listdir(base_path)
+                def extract_number(filename):
+                    match = re.match(r'generation_(\d+)\.pkl$', filename)
+                    return int(match.group(1)) if match else -1
+
+                max_file = max(all_files, key=extract_number)
+                self.aces_args.path_checkpoint_archive = base_path + max_file
+                print("resume experiment from the given a archive checkpoint: ", self.aces_args.path_checkpoint_archive)
+                
             if "json" in self.aces_args.path_checkpoint_archive:
                 with open(self.aces_args.path_checkpoint_archive, 'r') as f:
                     list_codes = json.load(f)
