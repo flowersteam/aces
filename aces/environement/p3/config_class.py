@@ -192,9 +192,16 @@ class LLMArguments:
             "help": "enable EP for MoE"
         },
     )
+    presence_penalty: float = field(
+        default=0.0,
+        metadata={
+            "help": "frequency penalty"
+        },
+    )
     kwargs_engine: str = field(
         default="",
         metadata={
             "help": "additional kwargs for engine, e.g. --kwargs-engine='--enable-reasoning '"
         },
     )
+

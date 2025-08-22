@@ -239,6 +239,11 @@ class ACES_p3(ACES_base):
             
             list_prompt.append(prompt)
 
+        # print lengthiest prompt (to check if problem)
+        idx_max = np.argmax(len(p) for p in list_prompt)
+        print(f"Max prompt length: {len(list_prompt[idx_max])}")
+        print(f"\n=====\nMax prompt:\n {list_prompt[idx_max]}\n=====\n")
+
         list_prompt_chat = self.formating_chat_prompt(list_prompt)
         new_puzzles = self.llm.multiple_completion(list_prompt_chat)
         new_puzzles = [p.response[0] for p in new_puzzles]

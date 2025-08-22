@@ -27,6 +27,7 @@ class ACES_base:
         # initialize environment
         self.aces_args = AcesArguments 
         self.initialize_environment()
+        self.save_archive()
         self.rng = np.random.default_rng(self.aces_args.seed)
 
 
@@ -53,21 +54,7 @@ class ACES_base:
     def init_llm(self,) -> None:
         """init LLM client"""
         print("init LLM client")
-        cfg_generation = {"model": self.llm_args.model_name_or_path, "temperature": self.llm_args.temperature}
-        if self.llm_args.max_tokens!= -1:
-            cfg_generation["max_tokens"] = self.llm_args.max_tokens
-        if self.llm_args.min_p!=0:
-            if "extra_body" not in cfg_generation:
-                cfg_generation["extra_body"] = {}
-
-            cfg_generation["extra_body"]["min_p"] = self.llm_args.min_p
-            cfg_generation["min_p"] = self.llm_args.min_p
-        if self.llm_args.top_k!=-1:
-            if "extra_body" not in cfg_generation:
-                cfg_generation["extra_body"] = {}
-            cfg_generation["extra_body"]["top_k"] = self.llm_args.top_k
-        if self.llm_args.top_p!=1:
-            cfg_generation["top_p"] = self.llm_args.top_p
+        cfg_generation = {}
         self.llm = LLMClient(model = self.llm_args.model_name_or_path, 
                              cfg_generation = cfg_generation,
                              base_url = self.llm_args.base_url, 

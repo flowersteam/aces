@@ -242,16 +242,37 @@ def check_server_run(model_path, port, server_process,vllm=False):
     return True
 
 class LLMClient:
-    def __init__(self, model: str, cfg_generation: dict, base_url: str ="",
+    def __init__(self, model: str, cfg_generation: dict = {}, base_url: str ="",
                   api_key: str="None", online: bool = False, gpu=1,
                     max_model_length=20000, azure=False,
                     local_server=False, seed=0, fp8=False, gpu_memory=0.9,
                     sglang= False, log_level="info",enable_thinking=True, ep_moe = False, kwargs_engine=""):
+        
+
+        # init cfg generation
+        cfg_generation = {"model": self.llm_args.model_name_or_path, "temperature": self.llm_args.temperature}
+        if self.llm_args.max_tokens!= -1:
+            cfg_generation["max_tokens"] = self.llm_args.max_tokens
+        if self.llm_args.min_p!=0:
+            if "extra_body" not in cfg_generation:
+                cfg_generation["extra_body"] = {}
+
+            cfg_generation["extra_body"]["min_p"] = self.llm_args.min_p
+            cfg_generation["min_p"] = self.llm_args.min_p
+        if self.llm_args.top_k!=-1:
+            if "extra_body" not in cfg_generation:
+                cfg_generation["extra_body"] = {}
+            cfg_generation["extra_body"]["top_k"] = self.llm_args.top_k
+        if self.llm_args.top_p!=1:
+            cfg_generation["top_p"] = self.llm_args.top_p
+        if self.llm_args.presence_penalty!=0:
+            cfg_generation["presence_penalty"] = self.llm_args.presence_penalty
+
         self.model_path = model
         self.cfg_generation = cfg_generation
         self.base_url = base_url
         self.api_key = api_key
-        self.timeout = 60*60*2 # 2 h timeout
+        self.timeout = 60*60*4 # 4 h timeout
         self.online = online
         self.gpu = gpu
         self.max_model_length = max_model_length
