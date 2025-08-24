@@ -235,6 +235,12 @@ class ACES_p3(ACES_base):
         list_description = self.llm.multiple_completion(self.formating_chat_prompt(list_prompt))
         for i in range(len(puzzles)):
             reasoning, description = self.exctract_reasoning_response(list_description[i].response[0],think_stop_tag=self.llm.think_stop_tag)
+            if "<think>" in description:
+                # stuck in thinking
+                description = description.split("<think>")[1]
+            if len(description) > 1000:
+                description = description[:1000] +  " [description truncated]"
+
             puzzles[i].description = description
         return puzzles
 
