@@ -269,7 +269,7 @@ class ACES_p3(ACES_base):
         list_prompt_chat = self.formating_chat_prompt(list_prompt)
         new_puzzles = self.llm.multiple_completion(list_prompt_chat)
         new_puzzles = [p.response[0] for p in new_puzzles]
-        print("\n\n============   new puzzles generated:   ============\n\n", len(new_puzzles[idx_max]))
+        print("\n\n============   new puzzles generated:   ============\n\n", new_puzzles[idx_max])
         #TODO: exctract puzzles + ... 
         list_new_p3 = []
 
