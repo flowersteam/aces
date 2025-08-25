@@ -823,7 +823,7 @@ def load_magistral_2507_system_prompt() -> dict[str]:
     index_begin_think = system_prompt.find("[THINK]")
     index_end_think = system_prompt.find("[/THINK]")
 
-    return {
+    return [{
         "role": "system",
         "content": [
             {"type": "text", "text": system_prompt[:index_begin_think]},
@@ -839,7 +839,7 @@ def load_magistral_2507_system_prompt() -> dict[str]:
                 "text": system_prompt[index_end_think + len("[/THINK]") :],
             },
         ],
-    }
+    }]
 if __name__ == "__main__":
     # test multi nodes
     model = "/lustre/fsn1/projects/rech/imi/uqv82bm/hf/GLM-4.5-Air-FP8"#Qwen2.5-14B-Instruct" #DeepSeek-R1-0528"
