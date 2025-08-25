@@ -313,7 +313,11 @@ class LLMClient:
         if not "extra_body" in self.cfg_generation:
             self.cfg_generation["extra_body"] = {}
         
-        self.cfg_generation["extra_body"].update({"chat_template_kwargs":{"enable_thinking": self.enable_thinking}})
+        if "DeepSeek-V3.1".lower() in model_lower:
+            self.cfg_generation["extra_body"].update({"chat_template_kwargs":{"thinking": self.enable_thinking}})
+        else:
+            self.cfg_generation["extra_body"].update({"chat_template_kwargs":{"enable_thinking": self.enable_thinking}})
+        
         self.reasoning_parser = ""
         if online:
             self.init_client()
