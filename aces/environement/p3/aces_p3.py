@@ -238,6 +238,8 @@ class ACES_p3(ACES_base):
             if "<think>" in description:
                 # stuck in thinking
                 description = description.split("<think>")[1]
+            if "[THINK]" in description:
+                description = description.split("[THINK]")[1]   
             if len(description) > 1000:
                 description = description[:1000] +  " [description truncated]"
 
@@ -262,12 +264,13 @@ class ACES_p3(ACES_base):
         # print lengthiest prompt (to check if problem)
         idx_max = np.argmax(len(p) for p in list_prompt)
         print(f"Max prompt length: {len(list_prompt[idx_max])}")
-        print(f"\n=====\nMax prompt:\n {list_prompt[idx_max]}\n=====\n")
+        print(f"\n=====\nMax len prompt:\n {list_prompt[idx_max]}\n=============\n\n")
 
         list_prompt_chat = self.formating_chat_prompt(list_prompt)
         new_puzzles = self.llm.multiple_completion(list_prompt_chat)
         new_puzzles = [p.response[0] for p in new_puzzles]
-        #TODO: exctract puzzles + ...
+        print("\n\n============   new puzzles generated:   ============\n\n", len(new_puzzles[idx_max]))
+        #TODO: exctract puzzles + ... 
         list_new_p3 = []
 
         for id_puzzle,new_puzzle in enumerate(new_puzzles):

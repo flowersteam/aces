@@ -286,6 +286,8 @@ class LLMClient:
         # qwen3 for specific stuff link to qwen3 (yarn, hybrid thinking, etc.) 
         self.qwen3 = "qwen3" in model_lower 
         self.think_stop_tag = "</think>"
+        if "Magistral-Small-2507" in model_lower:
+            self.think_stop_tag = "[/THINK]"
 
         self.openai_model = "gpt-oss" in model_lower
         if self.openai_model:
@@ -461,13 +463,20 @@ class LLMClient:
         """Prepend the system prompt to each message in the batch."""
         model = self.model_path.lower()
         if "magistral" in model:
+            if "2506" in model:
+                magistral_sys_prompt = magistral_2506_sys_prompt
+            elif "2507" in model:
+                magistral_sys_prompt = load_magistral_2507_system_prompt()
+            else:
+                raise ValueError(f"Unknown magistral model: {model}")
             sys_prompt = magistral_sys_prompt
         elif "llama-3_3-nemotron-super" in model:
             sys_prompt =  f"detailed thinking {self.enable_thinking}"
-            if self.enable_thinking:
-                sys_prompt =  f""
-            else:
-                sys_prompt =  f"/no_think"
+            if "v1_5" in model:
+                if self.enable_thinking:
+                    sys_prompt =  f""
+                else:
+                    sys_prompt =  f"/no_think"
         elif "gpt-oss" in model:
             sys_prompt = "Reasoning: high"
         else:
@@ -475,7 +484,10 @@ class LLMClient:
         patched_batch = []
         for message in batch_prompt:
             # Find the user message content
-            patched_message = [{"role": "system", "content": sys_prompt}] + message
+            if "Magistral-Small-2507".lower() in model:
+                patched_message = sys_prompt + message
+            else:
+                patched_message = [{"role": "system", "content": sys_prompt}] + message
             patched_batch.append(patched_message)
         return patched_batch
 
@@ -788,7 +800,7 @@ def kill_process_tree(parent_pid, include_parent: bool = True, skip_pid: int = N
         except psutil.NoSuchProcess:
             pass
 
-magistral_sys_prompt = """A user will ask you to solve a task. You should first draft your thinking process (inner monologue) until you have derived the final answer. Afterwards, write a self-contained summary of your thoughts (i.e. your summary should be succinct but contain all the critical steps you needed to reach the conclusion). You should use Markdown and Latex to format your response. Write both your thoughts and summary in the same language as the task posed by the user.
+magistral_2506_sys_prompt = """A user will ask you to solve a task. You should first draft your thinking process (inner monologue) until you have derived the final answer. Afterwards, write a self-contained summary of your thoughts (i.e. your summary should be succinct but contain all the critical steps you needed to reach the conclusion). You should use Markdown and Latex to format your response. Write both your thoughts and summary in the same language as the task posed by the user.
 
 Your thinking process must follow the template below:
 <think>
@@ -799,7 +811,35 @@ Here, provide a concise summary that reflects your reasoning and presents a clea
 
 Problem:"""
 
+magistral_2507_sys_prompt = """First draft your thinking process (inner monologue) until you arrive at a response. Format your response using Markdown, and use LaTeX for any mathematical equations. Write both your thoughts and the response in the same language as the input.
 
+Your thinking process must follow the template below:[THINK]Your thoughts or/and draft, like working through an exercise on scratch paper. Be as casual and as long as you want until you are confident to generate the response. Use the same language as the input.[/THINK]Here, provide a self-contained response."""
+
+def load_magistral_2507_system_prompt() -> dict[str]:
+    # file_path = hf_hub_download(repo_id=repo_id, filename=filename)
+    # with open(file_path, "r") as file:
+    #     system_prompt = file.read()
+    system_prompt = magistral_2507_sys_prompt
+    index_begin_think = system_prompt.find("[THINK]")
+    index_end_think = system_prompt.find("[/THINK]")
+
+    return {
+        "role": "system",
+        "content": [
+            {"type": "text", "text": system_prompt[:index_begin_think]},
+            {
+                "type": "thinking",
+                "thinking": system_prompt[
+                    index_begin_think + len("[THINK]") : index_end_think
+                ],
+                "closed": True,
+            },
+            {
+                "type": "text",
+                "text": system_prompt[index_end_think + len("[/THINK]") :],
+            },
+        ],
+    }
 if __name__ == "__main__":
     # test multi nodes
     model = "/lustre/fsn1/projects/rech/imi/uqv82bm/hf/GLM-4.5-Air-FP8"#Qwen2.5-14B-Instruct" #DeepSeek-R1-0528"
