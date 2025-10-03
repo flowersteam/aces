@@ -39,19 +39,23 @@ parser.add_argument("--presence_penalty", type=float, default=1.0, help="Presenc
 
 # nodes
 parser.add_argument("--nodes", type=int, default=1, help="Number of nodes to use for the job")
-parser.add_argument("--h", type=int, default=20, help="Number of hours to use for the job")
+parser.add_argument("--h", type=int, default=0, help="Number of hours to use for the job")
 
 args = parser.parse_args()
 
 if args.long:
     qos = "#SBATCH --qos=qos_gpu_h100-t4"
     h = 99
+    if args.h>0:
+        h = args.h
 elif args.dev:
     qos = "#SBATCH --qos=qos_gpu_h100-dev"
     h = 2
 else:
     qos= ""
-    h=args.h
+    h= 20
+    if args.h>0:
+        h=args.h
 script_template="""#!/bin/bash
 #SBATCH --account=imi@h100
 #SBATCH -C h100
