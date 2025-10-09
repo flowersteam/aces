@@ -196,7 +196,7 @@ class ACES_base:
         n_goals_to_sample = self.aces_args.batch_size
         n_skills = len(self.skill_list)
         list_skill_targeted = []
-        skills = list(range(1, n_skills+1))
+        skills = list(range(0, n_skills))
         # Generate all combinations of up to 5 skills
         skill_combinations = set()
         for r in range(1, self.aces_args.max_descriptor_targeted+1):  # From 1 skill to max_descriptor_targeted skills
