@@ -154,6 +154,9 @@ class ACES_p3(ACES_base):
             pass
         puzzle = just_problem + "\n" + solution
         puzzle = puzzle.split("\nassert f")
+        if 'if __name__' in puzzle[0]:
+            # remove extra stuff added by llm
+            puzzle[0] = puzzle[0].split('if __name__')[0]
         puzzle = puzzle[0] + "\nassert f(g()) == True\n"
         return puzzle
     
