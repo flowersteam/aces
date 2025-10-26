@@ -469,7 +469,7 @@ class LLMClient:
         if "magistral" in model:
             if "2506" in model:
                 magistral_sys_prompt = magistral_2506_sys_prompt
-            elif "2507" in model:
+            elif "2507" in model or "2509" in model:
                 magistral_sys_prompt = load_magistral_2507_system_prompt()
             else:
                 raise ValueError(f"Unknown magistral model: {model}")
