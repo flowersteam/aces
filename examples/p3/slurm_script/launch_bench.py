@@ -63,18 +63,38 @@ script_template="""#!/bin/bash
 #SBATCH --output=./out/{job_name}-%A.out
 #SBATCH --error=./out/{job_name}-%A.out
 # set -x
+
+
+
+# export TORCH_CUDA_ARCH_LIST="9.0"
+# export TMPDIR=$JOBSCRATCH
+# module purge
+# module load arch/h100
+# module load python/3.11.5
+# ulimit -c 0
+# limit coredumpsize 0
+# export CORE_PATTERN=/dev/null
+
+
+# {module_load}
+# conda activate {env_name}
+
+
 export TORCH_CUDA_ARCH_LIST="9.0"
 export TMPDIR=$JOBSCRATCH
 module purge
 module load arch/h100
-module load python/3.11.5
+module load python/3.12.2
 ulimit -c 0
 limit coredumpsize 0
 export CORE_PATTERN=/dev/null
+conda deactivate
 
+conda activate solace_sg5
+# module load cuda/12.6.3
+module load cudnn/9.10.2.21-12-cuda
+export SGLANG_DISABLE_CUDNN_CHECK=1
 
-{module_load}
-conda activate {env_name}
 cd /lustre/fswork/projects/rech/imi/uqv82bm/aces/examples/p3/
 
 {export_stuff}
