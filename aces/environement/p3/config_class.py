@@ -204,4 +204,10 @@ class LLMArguments:
             "help": "additional kwargs for engine, e.g. --kwargs-engine='--enable-reasoning '"
         },
     )
+    tokenizer_path: str = field(
+        default="",
+        metadata={
+            "help": "path to tokenizer for sglang (--tokenizer-path)"
+        },
+    )
 

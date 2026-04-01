@@ -44,7 +44,7 @@ def launch_vllm_serv(model_path: str, gpu: int = 1, max_model_length=20000, port
     # --enable-reasoning
     return server_process
 
-def launch_sglang_serv(model_path: str, gpu: int = 1, max_model_length=20000, port: int = 8000, fp8: bool = False, gpu_memory=0.9, seed: int = 0, log_level="info", add_yarn=False, kwargs_engine=""):
+def launch_sglang_serv(model_path: str, gpu: int = 1, max_model_length=20000, port: int = 8000, fp8: bool = False, gpu_memory=0.9, seed: int = 0, log_level="info", add_yarn=False, kwargs_engine="", tokenizer_path=""):
     command = f"python -m sglang.launch_server --model-path {model_path} --tp {gpu} --port {port} --mem-fraction-static {gpu_memory} --random-seed {seed} --host 0.0.0.0 --log-level {log_level} --trust-remote-code "
     if "fp8" in model_path:
         fp8 = False
@@ -62,6 +62,8 @@ def launch_sglang_serv(model_path: str, gpu: int = 1, max_model_length=20000, po
             command += '--json-model-override-args '+'{"rope_scaling":{"rope_type":"yarn","factor":4.0,"original_max_position_embeddings":32768}}'+' --context-length 131072 '
     else:
         command += f"--context-length {max_model_length} "
+    if tokenizer_path:
+        command += f"--tokenizer-path {tokenizer_path} "
     command += kwargs_engine
     server_process = execute_shell_command(
         command
@@ -73,7 +75,7 @@ def launch_sglang_serv(model_path: str, gpu: int = 1, max_model_length=20000, po
     # --enable-reasoning
     return server_process
 
-def launch_sglang_serv_multi_node(model_path: str, gpu: int = 1, max_model_length=20000, port: int = 8000, port_multinode:int = 5000, fp8: bool = False, gpu_memory=0.9, seed: int = 0, log_level="info", add_yarn=False, ep_moe=False, kwargs_engine=""):
+def launch_sglang_serv_multi_node(model_path: str, gpu: int = 1, max_model_length=20000, port: int = 8000, port_multinode:int = 5000, fp8: bool = False, gpu_memory=0.9, seed: int = 0, log_level="info", add_yarn=False, ep_moe=False, kwargs_engine="", tokenizer_path=""):
     tp = gpu
     
     worker_num = int(os.environ.get('SLURM_NNODES', 2))
@@ -130,6 +132,8 @@ def launch_sglang_serv_multi_node(model_path: str, gpu: int = 1, max_model_lengt
     command_sglang += f"--dist-init-addr {head_node_ip}:{port_multinode} --nnodes {n_nodes} "
     if ep_moe:
         command_sglang += "--enable-ep-moe "
+    if tokenizer_path:
+        command_sglang += f"--tokenizer-path {tokenizer_path} "
     command_sglang += kwargs_engine
     head_bash_command = f"""echo "BEGIN_IP on Head Node:" && hostname -I && echo "END_IP on Head Node" && \
 {command_sglang} --node-rank 0"""
@@ -280,6 +284,7 @@ class LLMClient:
         self.azure = azure
         self.local_server = local_server
         self.kwargs_engine = kwargs_engine
+        self.tokenizer_path = getattr(llm_args, 'tokenizer_path', '') if llm_args else ""
         # should add vllm or sglang option
         model_lower = model.lower()
 
@@ -336,17 +341,19 @@ class LLMClient:
                     port_multinode = np.random.randint(5000,7000)
                     server_process = launch_sglang_serv_multi_node(model_path=self.model_path, gpu= self.gpu,
                                                     max_model_length=self.max_model_length, port= port,port_multinode= port_multinode,
-                                                    fp8 = self.fp8, gpu_memory=self.gpu_memory, 
+                                                    fp8 = self.fp8, gpu_memory=self.gpu_memory,
                                                     seed = self.seed, log_level = self.log_level,
                                                     add_yarn=self.qwen3 or "qwq" in self.model_path.lower(),
-                                                    ep_moe=self.ep_moe, kwargs_engine=self.kwargs_engine)
+                                                    ep_moe=self.ep_moe, kwargs_engine=self.kwargs_engine,
+                                                    tokenizer_path=self.tokenizer_path)
                 else:
                     server_process = launch_sglang_serv(model_path=self.model_path, gpu= self.gpu,
                                                     max_model_length=self.max_model_length, port= port,
-                                                    fp8 = self.fp8, gpu_memory=self.gpu_memory, 
+                                                    fp8 = self.fp8, gpu_memory=self.gpu_memory,
                                                     seed = self.seed, log_level = self.log_level,
                                                     add_yarn=self.qwen3 or "qwq" in self.model_path.lower(),
-                                                    kwargs_engine=self.kwargs_engine)
+                                                    kwargs_engine=self.kwargs_engine,
+                                                    tokenizer_path=self.tokenizer_path)
                 
             else:
                 server_process = launch_vllm_serv(model_path=self.model_path, gpu= self.gpu,
@@ -373,7 +380,8 @@ class LLMClient:
                     if self.sglang:
                         server_process = launch_sglang_serv(model_path=self.model_path, gpu= self.gpu,
                                                         max_model_length=self.max_model_length, port= port,
-                                                        fp8 = self.fp8, gpu_memory=self.gpu_memory, seed = self.seed)
+                                                        fp8 = self.fp8, gpu_memory=self.gpu_memory, seed = self.seed,
+                                                        tokenizer_path=self.tokenizer_path)
                     else:
                         # launch vllm server
                         server_process = launch_vllm_serv(model_path=self.model_path, gpu= self.gpu,
