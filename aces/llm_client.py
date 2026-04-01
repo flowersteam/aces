@@ -284,7 +284,7 @@ class LLMClient:
         model_lower = model.lower()
 
         # qwen3 for specific stuff link to qwen3 (yarn, hybrid thinking, etc.) 
-        self.qwen3 = "qwen3" in model_lower 
+        self.qwen3 = False
         self.think_stop_tag = "</think>"
         if "Magistral-Small-2507" in model_lower:
             self.think_stop_tag = "[/THINK]"
