@@ -90,7 +90,7 @@ limit coredumpsize 0
 export CORE_PATTERN=/dev/null
 conda deactivate
 
-conda activate solace_sg5
+conda activate aces
 # module load cuda/12.6.3
 module load cudnn/9.10.2.21-12-cuda
 export SGLANG_DISABLE_CUDNN_CHECK=1
