@@ -81,6 +81,9 @@ class ACES_base:
         """Extract reasoning from the response"""
         reasoning = None
         sol = response
+        if response is None:
+            print(f"Warning: received None response, skipping reasoning extraction")
+            return None, ""
         if think_stop_tag in response:
             reasoning = response.split(think_stop_tag)[0].strip() + think_stop_tag
             sol = response.split(think_stop_tag)[1].strip()
