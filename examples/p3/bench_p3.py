@@ -54,7 +54,7 @@ archive_to_solve = [
 print(f"{len(archive_to_solve)} puzzles to solve with model {model_name}")
 
 # set mini-batch size
-batch_size = 200
+batch_size = aces_args.batch_size
 
 # evaluation loop in mini-batches
 # split the puzzles into mini‐batches up front
