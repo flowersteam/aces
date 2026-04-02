@@ -33,7 +33,7 @@ parser.add_argument("--fp8", action=argparse.BooleanOptionalAction, help="fp8")
 parser.add_argument("--enable_thinking", action=argparse.BooleanOptionalAction, help="enable thinking mode for qwen3 models")
 parser.add_argument("--max_model_length", type=int, default=-1, help="Max model length (context size) for the LLM, default is 8192")
 parser.add_argument("--max_tokens", type=int, default=-1, help="Max generated tokens for the LLM, default is 8192")
-parser.add_argument("--ep_moe", action=argparse.BooleanOptionalAction, help="Enable EP for MoE models")
+parser.add_argument("--ep_moe", type=int, default=1, help="Number of expert-parallel ranks for MoE models (--ep N), only used when > 1")
 parser.add_argument("--env_name", type=str, default="aces_sglang49p5", help="Environment name for conda activation, default is 'aces_sglang49p5' for sglang or 'aces' for non-sglang")
 parser.add_argument("--tokenizer_path", type=str, default="", help="Path to tokenizer for sglang (--tokenizer-path)")
 parser.add_argument("--presence_penalty", type=float, default=1.0, help="Presence penalty for the LLM")
@@ -151,8 +151,8 @@ for model in list_model:
         extra += " --fp8"
     else:
         extra += " --no-fp8"
-    if args.ep_moe:
-        extra += " --ep_moe"
+    if args.ep_moe > 1:
+        extra += f" --ep_moe {args.ep_moe}"
     if args.tokenizer_path:
         extra += f" --tokenizer_path {args.tokenizer_path}"
 

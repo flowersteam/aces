@@ -75,7 +75,7 @@ def launch_sglang_serv(model_path: str, gpu: int = 1, max_model_length=20000, po
     # --enable-reasoning
     return server_process
 
-def launch_sglang_serv_multi_node(model_path: str, gpu: int = 1, max_model_length=20000, port: int = 8000, port_multinode:int = 5000, fp8: bool = False, gpu_memory=0.9, seed: int = 0, log_level="info", add_yarn=False, ep_moe=False, kwargs_engine="", tokenizer_path=""):
+def launch_sglang_serv_multi_node(model_path: str, gpu: int = 1, max_model_length=20000, port: int = 8000, port_multinode:int = 5000, fp8: bool = False, gpu_memory=0.9, seed: int = 0, log_level="info", add_yarn=False, ep_moe=1, kwargs_engine="", tokenizer_path=""):
     tp = gpu
     
     worker_num = int(os.environ.get('SLURM_NNODES', 2))
@@ -130,8 +130,8 @@ def launch_sglang_serv_multi_node(model_path: str, gpu: int = 1, max_model_lengt
         command_sglang += f"--context-length {max_model_length} "
 
     command_sglang += f"--dist-init-addr {head_node_ip}:{port_multinode} --nnodes {n_nodes} "
-    if ep_moe:
-        command_sglang += "--enable-ep-moe "
+    if ep_moe > 1:
+        command_sglang += f"--ep {ep_moe} "
     if tokenizer_path:
         command_sglang += f"--tokenizer-path {tokenizer_path} "
     command_sglang += kwargs_engine
@@ -250,7 +250,7 @@ class LLMClient:
                   api_key: str="None", online: bool = False, gpu=1,
                     max_model_length=20000, azure=False,
                     local_server=False, seed=0, fp8=False, gpu_memory=0.9,
-                    sglang= False, log_level="info",enable_thinking=True, ep_moe = False, kwargs_engine="", llm_args = None):
+                    sglang= False, log_level="info",enable_thinking=True, ep_moe = 1, kwargs_engine="", llm_args = None):
         
 
         # init cfg generation
@@ -861,7 +861,7 @@ if __name__ == "__main__":
     local_server = True
     fp8=False
     sglang = True
-    ep_moe = True
+    ep_moe = 4
     llm = LLMClient(model=model, cfg_generation=cfg_generation, online=online, gpu=gpu, local_server=local_server, fp8=fp8, sglang=sglang, ep_moe=ep_moe)
     test_messages = [
         {"role": "system", "content": "You are a good assistant"},

@@ -186,10 +186,10 @@ class LLMArguments:
             "help": "enable thinking for the LLM (for hybrid model, e.g qwen3)"
         },
     )
-    ep_moe: bool = field(
-        default=False,
+    ep_moe: int = field(
+        default=1,
         metadata={
-            "help": "enable EP for MoE"
+            "help": "number of expert-parallel ranks for MoE models (--ep N), only used when > 1"
         },
     )
     presence_penalty: float = field(
