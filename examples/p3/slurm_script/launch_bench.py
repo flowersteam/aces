@@ -34,6 +34,7 @@ parser.add_argument("--enable_thinking", action=argparse.BooleanOptionalAction, 
 parser.add_argument("--max_model_length", type=int, default=-1, help="Max model length (context size) for the LLM, default is 8192")
 parser.add_argument("--max_tokens", type=int, default=-1, help="Max generated tokens for the LLM, default is 8192")
 parser.add_argument("--ep_moe", type=int, default=1, help="Number of expert-parallel ranks for MoE models (--ep N), only used when > 1")
+parser.add_argument("--dp_size", type=int, default=1, help="Data parallelism size for sglang (--dp-size N). When > 1, uses SMG-based DP with sglang_router for cache-aware routing")
 parser.add_argument("--env_name", type=str, default="aces_sglang49p5", help="Environment name for conda activation, default is 'aces_sglang49p5' for sglang or 'aces' for non-sglang")
 parser.add_argument("--tokenizer_path", type=str, default="", help="Path to tokenizer for sglang (--tokenizer-path)")
 parser.add_argument("--presence_penalty", type=float, default=1.0, help="Presence penalty for the LLM")
@@ -95,7 +96,6 @@ conda activate aces
 # module load cuda/12.6.3
 module load cudnn/9.10.2.21-12-cuda
 export SGLANG_DISABLE_CUDNN_CHECK=1
-
 cd /lustre/fswork/projects/rech/imi/uqv82bm/aces/examples/p3/
 
 {export_stuff}
@@ -153,6 +153,8 @@ for model in list_model:
         extra += " --no-fp8"
     if args.ep_moe > 1:
         extra += f" --ep_moe {args.ep_moe}"
+    if args.dp_size > 1:
+        extra += f" --dp_size {args.dp_size}"
     if args.tokenizer_path:
         extra += f" --tokenizer_path {args.tokenizer_path}"
 

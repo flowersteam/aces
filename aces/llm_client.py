@@ -44,8 +44,15 @@ def launch_vllm_serv(model_path: str, gpu: int = 1, max_model_length=20000, port
     # --enable-reasoning
     return server_process
 
-def launch_sglang_serv(model_path: str, gpu: int = 1, max_model_length=20000, port: int = 8000, fp8: bool = False, gpu_memory=0.9, seed: int = 0, log_level="info", add_yarn=False, kwargs_engine="", tokenizer_path=""):
-    command = f"python -m sglang.launch_server --model-path {model_path} --tp {gpu} --port {port} --mem-fraction-static {gpu_memory} --random-seed {seed} --host 0.0.0.0 --log-level {log_level} --trust-remote-code "
+def launch_sglang_serv(model_path: str, gpu: int = 1, max_model_length=20000, port: int = 8000, fp8: bool = False, gpu_memory=0.9, seed: int = 0, log_level="info", add_yarn=False, kwargs_engine="", tokenizer_path="", dp_size: int = 1):
+    # gpu = total GPUs, tp = per-replica tensor parallelism
+    tp = gpu // dp_size if dp_size > 1 else gpu
+    # Use SMG-based DP (sglang_router) when dp_size > 1 for cache-aware routing
+    if dp_size > 1:
+        module = "sglang_router.launch_server"
+    else:
+        module = "sglang.launch_server"
+    command = f"python -m {module} --model-path {model_path} --tp {tp} --port {port} --mem-fraction-static {gpu_memory} --random-seed {seed} --host 0.0.0.0 --log-level {log_level} --trust-remote-code "
     if "fp8" in model_path:
         fp8 = False
     if fp8:
@@ -64,26 +71,25 @@ def launch_sglang_serv(model_path: str, gpu: int = 1, max_model_length=20000, po
         command += f"--context-length {max_model_length} "
     if tokenizer_path:
         command += f"--tokenizer-path {tokenizer_path} "
+    if dp_size > 1:
+        command += f"--dp-size {dp_size} --router-policy cache_aware "
     command += kwargs_engine
     server_process = execute_shell_command(
         command
     )
     print(command)
-    # stuff to add later
-    # --uvicorn-log-level {debug,info,warning,error,critical,trace}
-    # --reasoning-parser
-    # --enable-reasoning
     return server_process
 
-def launch_sglang_serv_multi_node(model_path: str, gpu: int = 1, max_model_length=20000, port: int = 8000, port_multinode:int = 5000, fp8: bool = False, gpu_memory=0.9, seed: int = 0, log_level="info", add_yarn=False, ep_moe=1, kwargs_engine="", tokenizer_path=""):
-    tp = gpu
-    
+def launch_sglang_serv_multi_node(model_path: str, gpu: int = 1, max_model_length=20000, port: int = 8000, port_multinode:int = 5000, fp8: bool = False, gpu_memory=0.9, seed: int = 0, log_level="info", add_yarn=False, ep_moe=1, kwargs_engine="", tokenizer_path="", dp_size: int = 1):
+    # gpu = total GPUs per node, tp = per-replica tensor parallelism
+    tp = gpu // dp_size if dp_size > 1 else gpu
+
     worker_num = int(os.environ.get('SLURM_NNODES', 2))
     n_nodes = worker_num
     SLURM_JOB_NODELIST = os.environ.get('SLURM_JOB_NODELIST')
 
     SLURM_JOB_ID = os.environ.get('SLURM_JOB_ID')
-    nodes_result = subprocess.run(['scontrol', 'show', 'hostnames', SLURM_JOB_NODELIST], 
+    nodes_result = subprocess.run(['scontrol', 'show', 'hostnames', SLURM_JOB_NODELIST],
                                 capture_output=True, text=True)
 
     # Split the output into individual node names
@@ -91,27 +97,20 @@ def launch_sglang_serv_multi_node(model_path: str, gpu: int = 1, max_model_lengt
     head_node = nodes[0]
 
     # Get the IP address of the head node
-    head_node_ip_result = subprocess.run(['srun', '--nodes=1', '--ntasks=1', '-w', head_node, 
-                                        'hostname', '--ip-address'], 
+    head_node_ip_result = subprocess.run(['srun', '--nodes=1', '--ntasks=1', '-w', head_node,
+                                        'hostname', '--ip-address'],
                                         capture_output=True, text=True)
     head_node_ip = head_node_ip_result.stdout.strip()
 
-    # Handle potential space-separated IP addresses (IPv4/IPv6) - take the first one
-    # head_node_ip = head_node_ip.split()[0]
-
-    # Set environment variable
     os.environ['SGLANG_HOST_IP'] = head_node_ip
     print(f"Head node: {head_node}, Head node IP: {head_node_ip}")
-
-    head_env = os.environ.copy()
-    head_env['OUTLINES_CACHE_DIR'] = f"/tmp/{SLURM_JOB_ID}_0"
-
 
     print(f"{time.strftime('%Y-%m-%d %H:%M:%S')} Job {SLURM_JOB_ID} started ...")
     model = model_path
     if "fp8" in model_path.lower():
         fp8 = False
 
+    # Build base worker command (shared by both TP multi-node and DP modes)
     command_sglang = f"python3 -m sglang.launch_server --model-path {model} --tp {tp} --port {port} --mem-fraction-static {gpu_memory} --random-seed {seed} --host 0.0.0.0 --log-level {log_level} --trust-remote-code "
 
     if fp8:
@@ -129,87 +128,120 @@ def launch_sglang_serv_multi_node(model_path: str, gpu: int = 1, max_model_lengt
     else:
         command_sglang += f"--context-length {max_model_length} "
 
-    command_sglang += f"--dist-init-addr {head_node_ip}:{port_multinode} --nnodes {n_nodes} "
     if ep_moe > 1:
         command_sglang += f"--ep {ep_moe} "
     if tokenizer_path:
         command_sglang += f"--tokenizer-path {tokenizer_path} "
     command_sglang += kwargs_engine
+
+    # --- SMG-based DP mode (recommended): launch independent workers per node + SMG router ---
+    if dp_size > 1:
+        return _launch_multi_node_dp(
+            command_sglang, nodes, head_node, head_node_ip,
+            port, dp_size, SLURM_JOB_ID, worker_num
+        )
+
+    # --- Standard TP multi-node mode: single model sharded across nodes ---
+    command_sglang += f"--dist-init-addr {head_node_ip}:{port_multinode} --nnodes {n_nodes} "
+
+    head_env = os.environ.copy()
+    head_env['OUTLINES_CACHE_DIR'] = f"/tmp/{SLURM_JOB_ID}_0"
+
     head_bash_command = f"""echo "BEGIN_IP on Head Node:" && hostname -I && echo "END_IP on Head Node" && \
 {command_sglang} --node-rank 0"""
 
     print(f"Head Node command: {head_bash_command}")
     head_process = subprocess.Popen([
-        'srun', '--nodes=1', '--ntasks=1', '-w', head_node, 
+        'srun', '--nodes=1', '--ntasks=1', '-w', head_node,
         'bash', '-c', head_bash_command
     ], env=head_env)
 
-    HEAD_PID = head_process.pid
-
     # --- Give Head Node Time to Initialize ---
     print("Waiting for head node to initialize...")
-    time.sleep(10)  # Adjust this time if necessary
+    time.sleep(10)
 
     # --- Launch Worker Nodes ---
-    
-    worker_processes = []
-
-    # Loop starts from 1 because 0 is the head node
     for i in range(1, worker_num):
         node_i = nodes[i]
         print(f"STARTING WORKER {i} (Rank {i}) at {node_i}")
-        
+
         worker_env = os.environ.copy()
         worker_env['OUTLINES_CACHE_DIR'] = f"/tmp/{SLURM_JOB_ID}_{i}"
 
         worker_bash_command = f"{command_sglang} --node-rank {i}"
 
         print(f"Worker {i} command: {worker_bash_command}")
-        worker_process = subprocess.Popen([
+        subprocess.Popen([
             'srun', '--nodes=1', '--ntasks=1', '-w', node_i,
             'bash', '-c', worker_bash_command
         ], env=worker_env)
-        
-        worker_processes.append(worker_process)
 
-    # Optional: Wait for all processes to complete or handle them as needed
-    # For example, to wait for all processes:
-    # head_process.wait()
-    # for worker_process in worker_processes:
-    #     worker_process.wait()
-
-    # Or to keep the main script running while background processes execute:
-    print("All processes launched. Main script continuing...")
-
-
-
-    
-    # command = f"python -m sglang.launch_server --model-path {model_path} --tp {gpu} --port {port} --mem-fraction-static {gpu_memory} --random-seed {seed} --host 0.0.0.0 --log-level {log_level} --trust-remote-code "
-    
-    # if fp8:
-    #     command += "--quantization fp8 "
-
-    # # for qwq and qwen 3 model
-    # if add_yarn:
-    #     base_model_len = 32768
-    #     if max_model_length < base_model_len:
-    #         command += "--context-length {max_model_length} "
-    #     elif max_model_length < 2* base_model_len:
-    #         command += '--json-model-override-args '+ '{"rope_scaling":{"rope_type":"yarn","factor":2.0,"original_max_position_embeddings":32768}}'+' --context-length 65536 '
-    #     elif max_model_length < 4* base_model_len:
-    #         command += '--json-model-override-args '+'{"rope_scaling":{"rope_type":"yarn","factor":4.0,"original_max_position_embeddings":32768}}'+' --context-length 131072 '
-    # else:
-    #     command += f"--context-length {max_model_length} "
-            
-    # server_process = execute_shell_command(
-    #     command
-    # )
-    # print(command)
-    # stuff to add later
-    # --uvicorn-log-level {debug,info,warning,error,critical,trace}
-    # --reasoning-parser
-    # --enable-reasoning
+    print("All TP multi-node processes launched.")
     return head_process
+
+
+def _launch_multi_node_dp(command_sglang, nodes, head_node, head_node_ip, port, dp_size, SLURM_JOB_ID, worker_num):
+    """SMG-based DP across multiple nodes (Option B from sglang docs).
+
+    Each node runs an independent sglang worker, then the SMG router
+    (sglang_router.launch_router) connects them with cache-aware routing.
+    """
+    worker_urls = []
+    worker_base_port = port + 1  # workers use ports above the router port
+
+    # Launch an independent sglang worker on each node
+    for i in range(worker_num):
+        node_i = nodes[i]
+        worker_port = worker_base_port + i
+        worker_env = os.environ.copy()
+        worker_env['OUTLINES_CACHE_DIR'] = f"/tmp/{SLURM_JOB_ID}_{i}"
+
+        # Each worker is standalone (no --nnodes, no --dist-init-addr)
+        worker_cmd = f"{command_sglang} --port {worker_port}"
+        # Override the port that was already in command_sglang
+        worker_cmd = worker_cmd.replace(f"--port {port} ", "", 1)
+
+        print(f"Launching DP worker {i} on {node_i}:{worker_port}")
+        print(f"Worker {i} command: {worker_cmd}")
+        subprocess.Popen([
+            'srun', '--nodes=1', '--ntasks=1', '-w', node_i,
+            'bash', '-c', worker_cmd
+        ], env=worker_env)
+
+        # Resolve worker IP for the router URL
+        if i == 0:
+            worker_ip = head_node_ip
+        else:
+            ip_result = subprocess.run(
+                ['srun', '--nodes=1', '--ntasks=1', '-w', node_i, 'hostname', '--ip-address'],
+                capture_output=True, text=True
+            )
+            worker_ip = ip_result.stdout.strip()
+        worker_urls.append(f"http://{worker_ip}:{worker_port}")
+
+    # Wait for workers to start before launching router
+    print(f"Waiting for {worker_num} DP workers to initialize...")
+    time.sleep(30)
+
+    # Launch SMG router on head node pointing to all workers
+    worker_urls_str = " ".join(worker_urls)
+    router_cmd = (
+        f"python3 -m sglang_router.launch_router "
+        f"--worker-urls {worker_urls_str} "
+        f"--policy cache_aware "
+        f"--host 0.0.0.0 --port {port}"
+    )
+    print(f"Launching SMG router on {head_node}:{port}")
+    print(f"Router command: {router_cmd}")
+
+    router_env = os.environ.copy()
+    router_process = subprocess.Popen([
+        'srun', '--nodes=1', '--ntasks=1', '-w', head_node,
+        'bash', '-c', router_cmd
+    ], env=router_env)
+
+    print(f"SMG-based DP launched: {worker_num} workers + router on port {port}")
+    return router_process
 
 def check_server_run(model_path, port, server_process,vllm=False):
     """Check if the server is running and serving the correct model.
@@ -250,7 +282,7 @@ class LLMClient:
                   api_key: str="None", online: bool = False, gpu=1,
                     max_model_length=20000, azure=False,
                     local_server=False, seed=0, fp8=False, gpu_memory=0.9,
-                    sglang= False, log_level="info",enable_thinking=True, ep_moe = 1, kwargs_engine="", llm_args = None):
+                    sglang= False, log_level="info",enable_thinking=True, ep_moe = 1, dp_size=1, kwargs_engine="", llm_args = None):
         
 
         # init cfg generation
@@ -310,6 +342,7 @@ class LLMClient:
         self.log_level = log_level # default log level for sglang
         self.enable_thinking = enable_thinking 
         self.ep_moe = ep_moe
+        self.dp_size = getattr(llm_args, 'dp_size', 1) if llm_args else dp_size
         if self.qwen3: 
             if "coder" in model_lower  or "instruct" in model_lower or "thinking" in model_lower:
                 self.qwen3 = False
@@ -345,7 +378,8 @@ class LLMClient:
                                                     seed = self.seed, log_level = self.log_level,
                                                     add_yarn=self.qwen3 or "qwq" in self.model_path.lower(),
                                                     ep_moe=self.ep_moe, kwargs_engine=self.kwargs_engine,
-                                                    tokenizer_path=self.tokenizer_path)
+                                                    tokenizer_path=self.tokenizer_path,
+                                                    dp_size=self.dp_size)
                 else:
                     server_process = launch_sglang_serv(model_path=self.model_path, gpu= self.gpu,
                                                     max_model_length=self.max_model_length, port= port,
@@ -353,7 +387,8 @@ class LLMClient:
                                                     seed = self.seed, log_level = self.log_level,
                                                     add_yarn=self.qwen3 or "qwq" in self.model_path.lower(),
                                                     kwargs_engine=self.kwargs_engine,
-                                                    tokenizer_path=self.tokenizer_path)
+                                                    tokenizer_path=self.tokenizer_path,
+                                                    dp_size=self.dp_size)
                 
             else:
                 server_process = launch_vllm_serv(model_path=self.model_path, gpu= self.gpu,
@@ -381,7 +416,8 @@ class LLMClient:
                         server_process = launch_sglang_serv(model_path=self.model_path, gpu= self.gpu,
                                                         max_model_length=self.max_model_length, port= port,
                                                         fp8 = self.fp8, gpu_memory=self.gpu_memory, seed = self.seed,
-                                                        tokenizer_path=self.tokenizer_path)
+                                                        tokenizer_path=self.tokenizer_path,
+                                                        dp_size=self.dp_size)
                     else:
                         # launch vllm server
                         server_process = launch_vllm_serv(model_path=self.model_path, gpu= self.gpu,

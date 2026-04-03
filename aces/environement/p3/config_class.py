@@ -192,6 +192,12 @@ class LLMArguments:
             "help": "number of expert-parallel ranks for MoE models (--ep N), only used when > 1"
         },
     )
+    dp_size: int = field(
+        default=1,
+        metadata={
+            "help": "data parallelism size for sglang (--dp-size N). When > 1, uses SMG-based DP with sglang_router.launch_server for cache-aware routing"
+        },
+    )
     presence_penalty: float = field(
         default=0.0,
         metadata={
