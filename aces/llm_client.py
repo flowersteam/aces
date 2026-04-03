@@ -44,11 +44,11 @@ def launch_vllm_serv(model_path: str, gpu: int = 1, max_model_length=20000, port
     # --enable-reasoning
     return server_process
 
-def launch_sglang_serv(model_path: str, gpu: int = 1, max_model_length=20000, port: int = 8000, fp8: bool = False, gpu_memory=0.9, seed: int = 0, log_level="info", add_yarn=False, kwargs_engine="", tokenizer_path="", dp_size: int = 1):
+def launch_sglang_serv(model_path: str, gpu: int = 1, max_model_length=20000, port: int = 8000, fp8: bool = False, gpu_memory=0.9, seed: int = 0, log_level="info", add_yarn=False, kwargs_engine="", tokenizer_path="", dp_size: int = 1, dp_router: bool = False):
     # gpu = total GPUs, tp = per-replica tensor parallelism
     tp = gpu // dp_size if dp_size > 1 else gpu
-    # Use SMG-based DP (sglang_router) when dp_size > 1 for cache-aware routing
-    if dp_size > 1:
+    # SMG router (sglang_router) vs native DP (sglang.launch_server --dp-size)
+    if dp_size > 1 and dp_router:
         module = "sglang_router.launch_server"
     else:
         module = "sglang.launch_server"
@@ -72,7 +72,9 @@ def launch_sglang_serv(model_path: str, gpu: int = 1, max_model_length=20000, po
     if tokenizer_path:
         command += f"--tokenizer-path {tokenizer_path} "
     if dp_size > 1:
-        command += f"--dp-size {dp_size} --router-policy cache_aware "
+        command += f"--dp-size {dp_size} "
+        if dp_router:
+            command += "--router-policy cache_aware "
     command += kwargs_engine
     server_process = execute_shell_command(
         command
@@ -80,7 +82,7 @@ def launch_sglang_serv(model_path: str, gpu: int = 1, max_model_length=20000, po
     print(command)
     return server_process
 
-def launch_sglang_serv_multi_node(model_path: str, gpu: int = 1, max_model_length=20000, port: int = 8000, port_multinode:int = 5000, fp8: bool = False, gpu_memory=0.9, seed: int = 0, log_level="info", add_yarn=False, ep_moe=1, kwargs_engine="", tokenizer_path="", dp_size: int = 1):
+def launch_sglang_serv_multi_node(model_path: str, gpu: int = 1, max_model_length=20000, port: int = 8000, port_multinode:int = 5000, fp8: bool = False, gpu_memory=0.9, seed: int = 0, log_level="info", add_yarn=False, ep_moe=1, kwargs_engine="", tokenizer_path="", dp_size: int = 1, dp_router: bool = False):
     # gpu = total GPUs per node, tp = per-replica tensor parallelism
     tp = gpu // dp_size if dp_size > 1 else gpu
 
@@ -134,14 +136,16 @@ def launch_sglang_serv_multi_node(model_path: str, gpu: int = 1, max_model_lengt
         command_sglang += f"--tokenizer-path {tokenizer_path} "
     command_sglang += kwargs_engine
 
-    # --- SMG-based DP mode (recommended): launch independent workers per node + SMG router ---
-    if dp_size > 1:
+    # --- SMG-based DP mode: launch independent workers per node + SMG router ---
+    if dp_size > 1 and dp_router:
         return _launch_multi_node_dp(
             command_sglang, nodes, head_node, head_node_ip,
             port, dp_size, SLURM_JOB_ID, worker_num
         )
 
-    # --- Standard TP multi-node mode: single model sharded across nodes ---
+    # --- Standard TP multi-node mode (or native DP): single model sharded across nodes ---
+    if dp_size > 1:
+        command_sglang += f"--dp-size {dp_size} "
     command_sglang += f"--dist-init-addr {head_node_ip}:{port_multinode} --nnodes {n_nodes} "
 
     head_env = os.environ.copy()
@@ -343,6 +347,7 @@ class LLMClient:
         self.enable_thinking = enable_thinking 
         self.ep_moe = ep_moe
         self.dp_size = getattr(llm_args, 'dp_size', 1) if llm_args else dp_size
+        self.dp_router = getattr(llm_args, 'dp_router', False) if llm_args else False
         if self.qwen3: 
             if "coder" in model_lower  or "instruct" in model_lower or "thinking" in model_lower:
                 self.qwen3 = False
@@ -379,7 +384,8 @@ class LLMClient:
                                                     add_yarn=self.qwen3 or "qwq" in self.model_path.lower(),
                                                     ep_moe=self.ep_moe, kwargs_engine=self.kwargs_engine,
                                                     tokenizer_path=self.tokenizer_path,
-                                                    dp_size=self.dp_size)
+                                                    dp_size=self.dp_size,
+                                                    dp_router=self.dp_router)
                 else:
                     server_process = launch_sglang_serv(model_path=self.model_path, gpu= self.gpu,
                                                     max_model_length=self.max_model_length, port= port,
@@ -388,7 +394,8 @@ class LLMClient:
                                                     add_yarn=self.qwen3 or "qwq" in self.model_path.lower(),
                                                     kwargs_engine=self.kwargs_engine,
                                                     tokenizer_path=self.tokenizer_path,
-                                                    dp_size=self.dp_size)
+                                                    dp_size=self.dp_size,
+                                                    dp_router=self.dp_router)
                 
             else:
                 server_process = launch_vllm_serv(model_path=self.model_path, gpu= self.gpu,
@@ -417,7 +424,8 @@ class LLMClient:
                                                         max_model_length=self.max_model_length, port= port,
                                                         fp8 = self.fp8, gpu_memory=self.gpu_memory, seed = self.seed,
                                                         tokenizer_path=self.tokenizer_path,
-                                                        dp_size=self.dp_size)
+                                                        dp_size=self.dp_size,
+                                                    dp_router=self.dp_router)
                     else:
                         # launch vllm server
                         server_process = launch_vllm_serv(model_path=self.model_path, gpu= self.gpu,

@@ -195,7 +195,13 @@ class LLMArguments:
     dp_size: int = field(
         default=1,
         metadata={
-            "help": "data parallelism size for sglang (--dp-size N). When > 1, uses SMG-based DP with sglang_router.launch_server for cache-aware routing"
+            "help": "data parallelism size for sglang (--dp-size N). When > 1, enables data parallelism"
+        },
+    )
+    dp_router: bool = field(
+        default=False,
+        metadata={
+            "help": "use SMG-based DP (sglang_router.launch_server) instead of native DP (sglang.launch_server) for cache-aware routing"
         },
     )
     presence_penalty: float = field(
